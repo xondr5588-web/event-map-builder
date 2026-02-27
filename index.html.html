@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>행사 주차·교통 운영도 (v10.14)</title>
+<script defer="" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=b4anccamja&submodules=geocoder"></script>
+<style>
+    :root{
+      --bg:#fafafa; --card:#fff; --line:#e5e7eb; --txt:#111827; --muted:#6b7280;
+      --btn:#111827; --danger:#dc2626;
+    }
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color:var(--txt); }
+    #wrap { display: grid; grid-template-columns: 1fr 420px; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    #side { border-left:1px solid var(--line); padding:14px; overflow:auto; background:var(--bg); }
+    h1{ font-size:16px; margin:0 0 6px; }
+    h2{ font-size:13px; margin:0 0 8px; }
+    .muted{ color:var(--muted); font-size:12px; line-height:1.35; }
+    .box{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px; margin:10px 0; }
+    .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .sep{ height:1px; background:var(--line); margin:10px 0; }
+    button{
+      appearance:none; border:1px solid #d1d5db; background:#fff;
+      border-radius:12px; padding:8px 10px; font-size:12px; cursor:pointer;
+    }
+    button.primary{ background:var(--btn); color:#fff; border-color:var(--btn); }
+    button.danger{ background:var(--danger); color:#fff; border-color:var(--danger); }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+    select,input{
+      border:1px solid #d1d5db; border-radius:12px; padding:8px 10px; font-size:12px; background:#fff;
+    }
+    textarea{ width:100%; height:150px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }
+    .pill{ display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:12px;}
+    .dot{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+    .dot.green{ background:#22c55e; } .dot.orange{ background:#f97316; } .dot.yellow{ background:#facc15; }
+    .dot.red{ background:#ef4444; } .dot.blue{ background:#2563eb; } .dot.amber{ background:#f59e0b; }
+    .kbd{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f3f4f6; padding:2px 6px; border-radius:8px; border:1px solid var(--line); }
+
+    .item{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:12px; background:#fff; margin:6px 0;}
+    .item .left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .item .name{ font-size:12px; font-weight:900; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
+    .item .meta{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .item .btns{ display:flex; gap:6px; flex-wrap:wrap; }
+    .item button{ padding:6px 8px; border-radius:10px; font-size:11px; }
+    .item input.rename{ font-size:12px; font-weight:800; padding:6px 8px; border-radius:10px; }
+
+    .toggle{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--txt); }
+    .toggle input{ transform:scale(1.1); }
+
+    body.printmode #side { display:none; }
+    body.printmode #wrap { grid-template-columns: 1fr; }
+    #printLegend{
+      position:absolute; left:12px; top:12px; z-index:9999;
+      background:rgba(255,255,255,.95); border:1px solid rgba(0,0,0,.12);
+      border-radius:14px; padding:10px 12px; box-shadow:0 10px 28px rgba(0,0,0,.15);
+      display:none; max-width:520px;
+    }
+    body.printmode #printLegend{ display:block; }
+
+    #printActions{
+      position:fixed; right:12px; top:12px; z-index:10000;
+      display:none; gap:8px;
+      background:rgba(255,255,255,.92); border:1px solid rgba(0,0,0,.12);
+      border-radius:14px; padding:8px; box-shadow:0 10px 28px rgba(0,0,0,.15);
+    }
+    body.printmode #printActions{ display:flex; }
+    body.printmode #printActions button{ box-shadow:none; }
+
+    #printLegend .title{ font-weight:1000; font-size:13px; margin-bottom:6px; }
+    #toast{
+      position:fixed; left:12px; bottom:12px; z-index:99999;
+      background:#111827; color:#fff; padding:10px 12px; border-radius:12px; font-size:12px;
+      box-shadow:0 10px 24px rgba(0,0,0,.22); display:none; max-width:520px; line-height:1.35;
+    }
+  
+    @media print{
+      html,body{height:100%; overflow:hidden;}
+      #side{display:none !important;}
+      #mapWrap{width:100% !important;}
+      #map{height:100vh !important;}
+      .topbar, .toast, .floating, #help, #savedPanel{display:none !important;}
+      /* keep map only */
+    }
+
+    /* ===== editable marker labels ===== */
+    .mLabel{
+      display:inline-flex; align-items:center; gap:8px;
+      cursor:default;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(255,255,255,.96);
+      font-size:12px;
+      font-weight:900;
+      box-shadow:0 10px 24px rgba(0,0,0,.10);
+      white-space:nowrap;
+      pointer-events:auto;
+      user-select:text;
+    }
+    .mLabel .mText{
+      outline:none;
+      min-width:16px;
+    }
+    .mLabel .mDrag{
+      font-weight:1000;
+      color:rgba(0,0,0,.55);
+      cursor:grab;
+      letter-spacing:-2px;
+      user-select:none;
+      opacity:0;
+      transition:opacity .12s ease;
+    }
+    .mLabel:hover .mDrag{ opacity:1; }
+    .mLabel .mDrag:active{ cursor:grabbing; }
+
+    .mLabel .mX{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:18px; height:18px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.18);
+      background:rgba(17,24,39,.08);
+      color:#111827;
+      font-weight:1000;
+      cursor:pointer;
+      opacity:0;
+      transition:opacity .12s ease;
+    }
+    .mLabel:hover .mX{ opacity:1; }
+    .mLabel:focus-within{
+      box-shadow:0 12px 28px rgba(0,0,0,.16);
+      border-color:rgba(0,0,0,.22);
+      background:rgba(255,255,255,.98);
+    }
+
+    
+    /* print mode actions */
+    #printActions{
+      position:absolute; right:12px; top:12px; z-index:10000;
+      display:none; gap:8px; align-items:center;
+      background:rgba(255,255,255,.92); border:1px solid rgba(0,0,0,.12);
+      border-radius:14px; padding:8px; box-shadow:0 10px 28px rgba(0,0,0,.15);
+    }
+    body.printmode #printActions{ display:flex; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<div style="position:relative">
+<div id="map"></div>
+<div id="printLegend">
+<div class="title" id="plTitle">행사 주차·교통 운영도</div>
+<div class="muted">※ 인쇄 모드</div>
+<div class="sep"></div>
+<div class="row" id="plItems" style="flex-wrap:wrap;gap:8px"></div>
+</div><div class="floating" id="printActions"><button class="primary" id="printNow">PDF/인쇄</button><button id="exitPrint">편집으로</button></div>
+</div>
+<div id="side">
+<h1>행사 주차·교통 운영도 (v10.14)</h1>
+<div class="muted">
+      입구/출구는 <b>문 아이콘 대신</b> “차량 진입(IN) / 차량 출차(OUT) / 통제” 표식으로 바꿔서 현장용으로 더 직관적으로 했음.
+    </div>
+<div class="box">
+<h2>프로젝트</h2>
+<div class="row">
+<input id="projTitle" placeholder="제목(예: 4/25 행사 주차·교통 운영도)" style="flex:1; min-width:220px"/>
+<button id="printToggle">인쇄 모드</button>
+
+</div>
+<div class="row" style="margin-top:8px">
+  <input id="addr" placeholder="주소/장소 검색(예: 김해시청, OO체육관)" style="flex:1; min-width:220px"/>
+  <button id="goAddr">주소로 이동</button>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="danger" id="newProject">새로 시작</button>
+<button id="saveVersion">버전 저장</button>
+<select id="versionList" style="flex:1; min-width:180px"></select>
+<button id="loadVersion">불러오기</button>
+</div>
+<div class="muted" style="margin-top:8px">자동 저장 ON(브라우저). 실수해도 버전에서 복구 가능.</div>
+</div>
+<div class="box">
+<h2>Undo / Redo</h2>
+<div class="row">
+<button id="undo">Undo (Ctrl+Z)</button>
+<button id="redo">Redo (Ctrl+Y)</button>
+</div>
+</div>
+<div class="box">
+<h2>레이어 표시</h2>
+<div class="row">
+<label class="toggle"><input checked="" id="showAreas" type="checkbox"/>구역</label>
+<label class="toggle"><input checked="" id="showLines" type="checkbox"/>선</label>
+<label class="toggle"><input checked="" id="showMarkers" type="checkbox"/>마커</label>
+<label class="toggle"><input checked="" id="showMarkerLabels" type="checkbox"/>마커 라벨</label>
+<label class="toggle"><input checked="" id="snapOn" type="checkbox"/>스냅</label>
+</div>
+<div class="row" style="margin-top:8px; flex-wrap:nowrap;">
+        <span class="muted" style="min-width:70px">구역 투명도</span>
+        <input id="areaOpacity" type="range" min="0" max="40" value="18" style="flex:1; min-width:140px"/>
+      </div>
+      <div class="row" style="margin-top:8px; flex-wrap:nowrap;">
+        <span class="muted" style="min-width:70px">선 두께</span>
+        <input id="lineWidth" type="range" min="3" max="10" value="6" style="flex:1; min-width:140px"/>
+      </div>
+</div>
+<div class="box">
+<h2>생성 모드</h2>
+<div class="row">
+<button class="primary" id="modeArea">구역</button>
+<button id="modeLine">선</button>
+<button id="modeMarker">마커</button>
+</div>
+<div class="row" style="margin-top:10px">
+<label class="muted" style="margin:0">세부 타입</label>
+<select id="subtype"></select>
+</div>
+
+      <div class="row" style="margin-top:8px">
+        <label class="muted" style="margin:0; min-width:70px">색상</label>
+        <input id="styleColor" type="color" value="#22c55e" style="width:54px; height:34px; padding:0; border-radius:10px; border:1px solid #d1d5db; background:#fff"/>
+        <span class="muted" id="styleColorHint">현재 선택 타입 색상</span>
+        <button id="styleColorReset" type="button">기본색</button>
+        <button id="styleColorApplyAll" type="button">전체 일괄 적용</button>
+      </div>
+
+<div class="muted" style="margin-top:8px">
+        지도 클릭: 점 추가 · <span class="kbd">Backspace</span>: 마지막 점 삭제 · <span class="kbd">Enter</span>: 완료
+      </div>
+<div class="row" style="margin-top:6px">
+<button class="danger" id="clearTemp">작업 취소(임시)</button>
+</div>
+<div class="sep"></div>
+<h2>주차장 IN/OUT 빠른 생성</h2>
+<div class="row">
+<select id="parkingPick" style="flex:1; min-width:200px"></select>
+<button id="ioWizard">IN/OUT 찍기</button>
+</div>
+<div class="muted" style="margin-top:6px">버튼 누르고 지도에서 <b>IN 1번 클릭 → OUT 1번 클릭</b>하면 자동 생성.</div>
+</div>
+<div class="box">
+<h2>저장(완료) 패널</h2>
+<div class="row" style="margin-top:8px">
+<input id="pendingName" placeholder="이름(예: 주차장5 / 상단 일방통행 / 라바콘(이중주차))" style="flex:1; min-width:240px"/>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="primary" disabled="" id="pendingSave">저장</button>
+<button class="danger" disabled="" id="pendingCancel">취소</button>
+<span class="muted" id="pendingHint">대기중…</span>
+</div>
+</div>
+<div class="box">
+<h2>저장된 항목</h2>
+<div class="row">
+<input id="search" placeholder="검색(예: 주차장3, 라바콘, 일방, 진입, 출차, 통제)" style="flex:1; min-width:220px"/>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="primary" id="tabAreas">구역</button>
+<button id="tabLines">선</button>
+<button id="tabMarkers">마커</button>
+</div>
+<div class="row" style="gap:6px; margin-top:8px">
+<button disabled="" id="editToggle">편집 시작</button>
+<button disabled="" id="addPoint">점 추가(OFF)</button>
+<button disabled="" id="reverseLine">방향 반전</button>
+<button disabled="" id="fitSel">선택 보기</button>
+</div>
+<div class="row" style="margin-top:8px">
+<span class="muted">일방 화살표 간격(m)</span>
+<input id="arrowSpacing" max="200" min="10" style="width:92px" type="number" value="40"/>
+</div>
+<div class="row" style="margin-top:6px">
+<span class="muted">라바콘 간격(m)</span>
+<input id="coneSpacing" max="50" min="2" style="width:92px" type="number" value="7"/>
+<button disabled="" id="applyDecor">적용</button>
+</div>
+<div class="box" id="savedList" style="margin:10px 0 0; padding:10px; max-height:300px; overflow:auto"></div>
+</div>
+<div class="box">
+<h2>좌표(JSON)</h2>
+<textarea id="out" spellcheck="false"></textarea>
+<div class="row" style="margin-top:8px">
+<button id="copy">복사</button>
+<button id="load">JSON 불러오기</button>
+<button id="fitAll">전체 맞춤</button>
+</div>
+</div>
+</div>
+</div>
+<div id="toast"></div>
+<script>
+
+  window.navermap_authFailure = function () {
+    alert("OpenAPI 인증 실패\n\n1) NCP 콘솔 > Maps App > Web 서비스 URL에 http://localhost / http://127.0.0.1 등록\n2) Live Server 주소(127.0.0.1 또는 localhost)로 접속했는지 확인");
+  };
+
+  const CENTER = { lat: 35.2017194, lng: 128.2259361 };
+  const DEFAULT_ZOOM = 16;
+  const LS_KEY = "event_map_v10_12_autosave";
+  const LS_VERS = "event_map_v10_12_versions";
+
+  let DATA = { areas: [], lines: [], markers: [], meta: { title: "행사 주차·교통 운영도", note: "주차 순서: 1→2→3→4→5" } };
+
+  const overlays = { areas: new Map(), lines: new Map(), markers: new Map() };
+
+  // 라벨 겹침 완화용(화면 픽셀 그리드 기준 스태킹)
+  let labelBuckets = new Map();
+
+
+  let map = null;
+  let currentScale = 1;
+  const clamp = (v,min,max)=>Math.max(min, Math.min(max,v));
+  function scaleByZoom(){
+    // zoom 16을 1.0 기준으로; 너무 작아지지 않게 클램프
+    const z = map?.getZoom ? map.getZoom() : 16;
+    return clamp(z/16, 0.65, 1.35);
+  }
+
+  let mode = "area";
+  let subtype = "parking";
+  let tab = "areas";
+  let selected = null;
+  let editing = false;
+  let addPointMode = false;
+  let vertexMarkers = [];
+  let tempPoints = [];
+  let tempLine = null;
+  let pending = null;
+  let ioWizard = { active:false, step:0, parkingName:null };
+
+  let layer = { areas:true, lines:true, markers:true, markerLabels:true, snap:true, areaOpacity:0.18, lineWidth:6,
+    styleOverrides:{ area:{}, line:{} }
+  };
+
+  const undoStack = [];
+  const redoStack = [];
+  const MAX_HISTORY = 60;
+
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+  const esc = (s) => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+
+  function shadeColor(hex, amt){
+    try{
+      let c=String(hex||"").replace("#","").trim();
+      if(c.length===3) c=c.split("").map(x=>x+x).join("");
+      const num=parseInt(c,16);
+      let r=(num>>16)&255, g=(num>>8)&255, b=num&255;
+      r=Math.max(0,Math.min(255,r+amt));
+      g=Math.max(0,Math.min(255,g+amt));
+      b=Math.max(0,Math.min(255,b+amt));
+      return "#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
+    }catch(e){ return hex; }
+  }
+  function getAreaBaseColor(kind){
+    return layer.styleOverrides?.area?.[kind] || null;
+  }
+  function getLineColor(kind){
+    return layer.styleOverrides?.line?.[kind] || null;
+  }
+
+  function toast(msg, ms=2300){
+    const t = document.getElementById("toast");
+    t.innerHTML = msg;
+    t.style.display = "block";
+    clearTimeout(toast._to);
+    toast._to = setTimeout(()=> t.style.display="none", ms);
+  }
+
+  // 주소/장소로 지도 이동 (네이버 Geocoder)
+  function goAddress(query){
+    const q = String(query||"").trim();
+    if(!q){ toast("주소를 입력해줘"); return; }
+    if(!naver?.maps?.Service?.geocode){
+      toast("Geocoder 로드 실패(스크립트 submodules=geocoder 확인)");
+      return;
+    }
+    naver.maps.Service.geocode({ query:q }, function(status, response){
+      if(status !== naver.maps.Service.Status.OK){
+        toast("검색 실패"); return;
+      }
+      const res = response?.v2;
+      const item = res?.addresses?.[0];
+      if(!item){ toast("검색 결과 없음"); return; }
+      const lat = parseFloat(item.y), lng = parseFloat(item.x);
+      if(!isFinite(lat) || !isFinite(lng)){ toast("좌표 변환 실패"); return; }
+      map.setCenter(new naver.maps.LatLng(lat,lng));
+      if(map.getZoom() < 15) map.setZoom(16);
+      toast(`이동: ${esc(item.roadAddress || item.jibunAddress || q)}`);
+    });
+  }
+
+  function deepClone(obj){ try { return structuredClone(obj); } catch(e){ return JSON.parse(JSON.stringify(obj)); } }
+
+  function setTextarea(){
+    document.getElementById("out").value = JSON.stringify(DATA, null, 2);
+    document.getElementById("plTitle").textContent = DATA.meta?.title || "행사 주차·교통 운영도";
+    // (인쇄 레전드 노트 제거)
+  }
+
+  function centroid(points){
+    let lat=0, lng=0;
+    for (const p of points){ lat += p.lat; lng += p.lng; try{ if(document.body.classList.contains("printmode")) refreshPrintLegend(); }catch(e){}
+  }
+    return { lat: lat/points.length, lng: lng/points.length };
+  }
+
+  function haversine(a,b){
+    const R=6371000, toRad=(d)=>d*Math.PI/180;
+    const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+    const lat1=toRad(a.lat), lat2=toRad(b.lat);
+    const s=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+    return 2*R*Math.asin(Math.sqrt(s));
+  }
+  function lineLength(points){
+    let m=0; for(let i=1;i<points.length;i++) m += haversine(points[i-1], points[i]); return m;
+  }
+  function polygonArea(points){
+    if (points.length < 3) return 0;
+    const R=6371000;
+    const lat0 = (points.reduce((s,p)=>s+p.lat,0)/points.length) * Math.PI/180;
+    const proj = (p)=>({ x: R*(p.lng*Math.PI/180)*Math.cos(lat0), y: R*(p.lat*Math.PI/180) });
+    const pts = points.map(proj);
+    let sum=0;
+    for(let i=0;i<pts.length;i++){
+      const j=(i+1)%pts.length;
+      sum += pts[i].x*pts[j].y - pts[j].x*pts[i].y;
+    }
+    return Math.abs(sum)/2;
+  }
+  const fmtMeters = (m)=> (m<1000? `${Math.round(m)}m` : `${(m/1000).toFixed(2)}km`);
+  const fmtArea = (m2)=> (m2<10000? `${Math.round(m2)}㎡` : `${(m2/10000).toFixed(2)}ha`);
+
+  function pushHistory(){
+    undoStack.push(deepClone(DATA));
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoRedoButtons();
+    autosave();
+  }
+  function updateUndoRedoButtons(){
+    document.getElementById("undo").disabled = undoStack.length===0;
+    document.getElementById("redo").disabled = redoStack.length===0;
+  }
+  function doUndo(){
+    if (!undoStack.length) return;
+    redoStack.push(deepClone(DATA));
+    DATA = undoStack.pop();
+    redrawAll();
+    updateUndoRedoButtons();
+    autosave();
+    toast("Undo");
+  }
+  function doRedo(){
+    if (!redoStack.length) return;
+    undoStack.push(deepClone(DATA));
+    DATA = redoStack.pop();
+    redrawAll();
+    updateUndoRedoButtons();
+    autosave();
+    toast("Redo");
+  }
+
+  function autosave(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify({data:DATA, ts:Date.now()})); }catch(e){}
+  }
+  function loadAutosave(){
+    try{
+      const raw=localStorage.getItem(LS_KEY);
+      if(!raw) return false;
+      const obj=JSON.parse(raw);
+      if(obj && obj.data){ DATA=obj.data; return true; }
+    }catch(e){}
+    return false;
+  }
+
+  function migrateData(){
+    // 기존 자동저장/JSON 호환: 필드 누락 보정 + 용어 변경 반영
+    if (!DATA) return;
+    DATA.meta = DATA.meta || { title:"행사 주차·교통 운영도", note:"" };
+
+    if (Array.isArray(DATA.markers)){
+      DATA.markers.forEach(m=>{
+        if (typeof m.rotation !== "number") m.rotation = 0;
+        if (typeof m.labelText !== "string") m.labelText = (typeof m.name==="string") ? m.name : "";
+
+        // 용어 변경: 관계자 확인 -> 관계자 입구
+        if (m.kind === "vipGate"){
+          if (typeof m.name === "string"){
+            if (m.name.includes("관계자 확인")) m.name = m.name.replaceAll("관계자 확인", "관계자 입구");
+            if (m.name.trim() === "관계자") m.name = "관계자 입구";
+          } else {
+            m.name = "관계자 입구";
+          }
+        }
+      });
+    }
+  }
+
+
+  function loadVersions(){
+    try{ const raw=localStorage.getItem(LS_VERS); if(!raw) return []; const arr=JSON.parse(raw); return Array.isArray(arr)?arr:[]; }catch(e){ return []; }
+  }
+  function refreshVersionList(selectLatest=false){
+    const sel=document.getElementById("versionList");
+    const arr=loadVersions();
+    sel.innerHTML = arr.length ? "" : `<option value="">(버전 없음)</option>`;
+    arr.forEach(v=>{
+      const d=new Date(v.ts);
+      const o=document.createElement("option");
+      o.value=v.id;
+      o.textContent = `${d.toLocaleString()} · ${v.title||"운영도"}`;
+      sel.appendChild(o);
+    });
+    if(selectLatest && arr.length) sel.value=arr[0].id;
+  }
+  function saveVersion(){
+    const arr=loadVersions();
+    arr.unshift({ id:uid(), ts:Date.now(), title: DATA.meta?.title || "운영도", data: deepClone(DATA) });
+    while(arr.length>15) arr.pop();
+    localStorage.setItem(LS_VERS, JSON.stringify(arr));
+    refreshVersionList(true);
+    toast("버전 저장");
+  }
+  function loadVersion(){
+    const id=document.getElementById("versionList").value;
+    if(!id) return;
+    const arr=loadVersions();
+    const v=arr.find(x=>x.id===id);
+    if(!v) return;
+    if(!confirm("이 버전으로 불러올까요?")) return;
+    pushHistory();
+    DATA=deepClone(v.data);
+    redrawAll();
+    toast("불러오기 완료");
+  }
+  function newProject(){
+    if(!confirm("새로 시작할까요?")) return;
+    pushHistory();
+    DATA={ areas:[], lines:[], markers:[], meta:{ title:"행사 주차·교통 운영도", note:"주차 순서: 1→2→3→4→5" } };
+    redrawAll();
+    toast("새 프로젝트");
+  }
+
+  function areaStyle(kind){
+    const op=layer.areaOpacity;
+    const base = getAreaBaseColor(kind);
+    if (base){
+      return { fill: base, fillOpacity:Math.min(0.30, op+0.08), stroke: shadeColor(base,-30), w:3 };
+    }
+    if (kind==="event") return { fill:"#f97316", fillOpacity:Math.min(0.30, op+0.08), stroke:"#ea580c", w:3 };
+    if (kind==="vip") return { fill:"#facc15", fillOpacity:Math.min(0.30, op+0.08), stroke:"#ca8a04", w:3 };
+    return { fill:"#22c55e", fillOpacity:op, stroke:"#16a34a", w:3 };
+  }
+  function lineStyle(kind){
+    const w=layer.lineWidth;
+    const override = getLineColor(kind);
+    if (kind==="vehicle") return { color: override||"#f97316", op:0.95, w:Math.max(w,7), style:"solid" };
+    if (kind==="pedestrian") return { color: override||"#2563eb", op:0.95, w:Math.max(w,6), style:"solid" };
+    if (kind==="oneway") return { color: override||"#ef4444", op:0.95, w:Math.max(w,7), style:"shortdash" };
+    if (kind==="cone") return { color: override||"#f59e0b", op:0.98, w:Math.max(w,7), style:"dot" };
+    if (kind==="tape") return { color: override||"#111827", op:0.25, w:Math.max(3, Math.min(w,5)), style:"dot" };
+    if (kind==="block") return { color: override||"#dc2626", op:0.0, w:Math.max(w,10), style:"solid" };
+    if (kind==="route") return { color: override||"#ef4444", op:0.92, w:Math.max(w,5), style:"solid" };
+    return { color: override||"#ef4444", op:0.92, w:Math.max(w,5), style:"solid" };
+  }
+
+  function labelTag(text){
+    return `<div style="padding:6px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.96);font-size:12px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.10);white-space:nowrap;">${esc(text)}</div>`;
+  }
+
+  
+  function markerLabelTag(text, mid){
+    // 편집/삭제 가능한 마커 라벨 (hover 시 X 표시)
+    return `
+      <div class="mLabel" data-mid="${esc(mid)}">
+        <span class="mText" contenteditable="true" spellcheck="false">${esc(text)}</span>
+        <span class="mDrag" title="라벨 이동" aria-label="라벨 이동">⋮⋮</span>
+        <span class="mX" title="라벨 삭제" aria-label="라벨 삭제">×</span>
+      </div>`;
+  }
+
+function coneSvg(size=16){
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 4px 8px rgba(0,0,0,.25));">
+        <path d="M28 6h8l10 34H18L28 6Z" fill="#f59e0b" stroke="rgba(0,0,0,.22)" stroke-width="2" />
+        <path d="M22 24h20l2 6H20l2-6Z" fill="#fff" opacity=".92"/>
+        <path d="M20 34h24l2 6H18l2-6Z" fill="#fff" opacity=".92"/>
+        <path d="M14 46h36l4 12H10l4-12Z" fill="#d97706" stroke="rgba(0,0,0,.22)" stroke-width="2" />
+      </svg>`;
+  }
+
+  function tapeSvg(w=120, h=18){
+  // 연속 안전띠(SECURITY LINE): 노랑/검정 사선 + 문구 반복
+  // w/h는 화면 픽셀 기준. (marker로 타일링해도 겹치도록 넉넉한 폭 사용)
+  const text = "SECURITY LINE";
+  return `
+    <svg width="${w}" height="${h}" viewBox="0 0 240 36" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 4px 8px rgba(0,0,0,.22));">
+      <defs>
+        <pattern id="diag" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="18" height="18" fill="#facc15"></rect>
+          <rect x="0" y="0" width="7" height="18" fill="#111827"></rect>
+        </pattern>
+      </defs>
+      <rect x="1.5" y="1.5" width="237" height="33" rx="7" fill="url(#diag)" stroke="rgba(0,0,0,.42)" stroke-width="3"/>
+      <g font-family="system-ui, -apple-system, Arial" font-size="14" font-weight="900" fill="#111827" opacity="0.96">
+        <text x="12"  y="23">${text}</text>
+        <text x="92"  y="23">${text}</text>
+        <text x="172" y="23">${text}</text>
+      </g>
+    </svg>`;
+}
+
+
+
+function barrierSvg(w=90, h=22){
+  // 바리케이드(차단선) 타일: 빨강/흰 띠 + 금지 아이콘
+  return `
+    <svg width="${w}" height="${h}" viewBox="0 0 180 44" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.25));">
+      <rect x="2" y="6" width="176" height="32" rx="10" fill="#ffffff" stroke="rgba(0,0,0,.35)" stroke-width="4"/>
+      <g>
+        <rect x="10" y="12" width="26" height="20" rx="6" fill="#dc2626"/>
+        <rect x="42" y="12" width="26" height="20" rx="6" fill="#dc2626"/>
+        <rect x="74" y="12" width="26" height="20" rx="6" fill="#dc2626"/>
+        <rect x="106" y="12" width="26" height="20" rx="6" fill="#dc2626"/>
+        <rect x="138" y="12" width="26" height="20" rx="6" fill="#dc2626"/>
+      </g>
+      <!-- no-entry sign -->
+      <circle cx="22" cy="22" r="8" fill="#ffffff" stroke="#dc2626" stroke-width="4"/>
+      <rect x="14" y="20" width="16" height="4" rx="2" fill="#dc2626"/>
+    </svg>`;
+}
+
+    function signSvg(text, bg, fg="#fff", iconChar=null){
+    const ico = iconChar ? `<div style="font-size:14px;line-height:1">${esc(iconChar)}</div>` : "";
+    return `
+      <div style="transform:translate(-18px,-36px);">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:${bg};color:${fg};font-weight:1000;border:2px solid rgba(0,0,0,.25);box-shadow:0 10px 24px rgba(0,0,0,.18);">
+          ${ico}
+          <div style="font-size:12px;letter-spacing:.2px">${esc(text)}</div>
+        </div>
+      </div>`;
+  }
+
+function stageSvg(size=22){
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:block">
+      <!-- canopy -->
+      <path d="M10 18L32 8l22 10-22 10-22-10Z" fill="#2563eb" stroke="rgba(0,0,0,.25)" stroke-width="2"/>
+      <path d="M10 18v10l22 10V28L10 18Z" fill="#1d4ed8" opacity=".9" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+      <path d="M54 18v10L32 38V28l22-10Z" fill="#3b82f6" opacity=".9" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+      <!-- truss legs -->
+      <path d="M16 28v18" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+      <path d="M48 28v18" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+      <path d="M16 34h32" stroke="#94a3b8" stroke-width="3" opacity=".9"/>
+      <!-- stage platform -->
+      <path d="M14 46h36l8 6H22l-8-6Z" fill="#111827" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>
+      <path d="M22 52h36v6H22v-6Z" fill="#0b1220" stroke="rgba(255,255,255,.10)" stroke-width="1.5"/>
+      <!-- speakers -->
+      <rect x="24" y="48" width="6" height="8" rx="1.5" fill="#374151"/>
+      <rect x="34" y="48" width="6" height="8" rx="1.5" fill="#374151"/>
+      <circle cx="27" cy="51" r="1.2" fill="#111827"/>
+      <circle cx="27" cy="54" r="1.2" fill="#111827"/>
+      <circle cx="37" cy="51" r="1.2" fill="#111827"/>
+      <circle cx="37" cy="54" r="1.2" fill="#111827"/>
+    </svg>`;
+}
+
+function stageBadge(labelText="무대"){
+  return `
+    <div style="transform:translate(-18px,-36px);">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:12px;background:#111827;color:#fff;font-weight:1000;border:2px solid rgba(0,0,0,.25);box-shadow:0 10px 24px rgba(0,0,0,.18);">
+        <div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;">
+          ${stageSvg(22)}
+        </div>
+        <div style="font-size:12px;letter-spacing:.2px;white-space:nowrap">${esc(labelText)}</div>
+      </div>
+    </div>`;
+}
+
+
+function stagePin(){
+  // 아이콘만(무대 라벨은 별도 라벨 기능으로 표시)
+  return `
+    <div style="transform:translate(-18px,-36px);width:46px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#111827;border:2px solid rgba(0,0,0,.25);box-shadow:0 10px 24px rgba(0,0,0,.22);">
+      ${stageSvg(30)}
+    </div>`;
+}
+
+
+  function parkingStaffPin(text){
+  // 주차관리원(경광봉) 캐릭터형 아이콘 (라벨은 별도)
+  return `
+    <div style="transform:translate(-22px,-50px); width:44px; height:56px;">
+      <div style="position:absolute; left:50%; top:0; transform:translateX(-50%);">
+        ${parkingStaffSvg(44,56)}
+      </div>
+    </div>`;
+}
+
+function parkingStaffSvg(w=44,h=56){
+  // ✅ 주차관리원(운영도용 픽토그램): 모자/얼굴 제거 + 조끼/유도봉만 남김
+  return `
+  <svg width="${w}" height="${h}" viewBox="0 0 88 112" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <defs>
+      <filter id="shadow_staff_p" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="rgba(0,0,0,.26)"/>
+      </filter>
+      <filter id="glow_baton" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="rgba(255,0,0,.55)"/>
+      </filter>
+    </defs>
+
+    <g filter="url(#shadow_staff_p)">
+      <!-- head silhouette (no face, no hat) -->
+      <circle cx="44" cy="28" r="13" fill="#f5c7a9" stroke="rgba(0,0,0,.32)" stroke-width="4"/>
+
+      <!-- body vest -->
+      <rect x="26" y="44" width="36" height="50" rx="11" fill="#a3e635" stroke="rgba(0,0,0,.32)" stroke-width="4"/>
+      <!-- reflective strips -->
+      <rect x="30" y="58" width="28" height="8" rx="4" fill="rgba(0,0,0,.14)"/>
+      <rect x="30" y="72" width="28" height="8" rx="4" fill="rgba(0,0,0,.10)"/>
+
+      <!-- arms (simple silhouette) -->
+      <path d="M24 56c-6 8-7 18-4 28" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+      <path d="M68 56c6 8 7 18 4 28" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+
+      <!-- baton -->
+      <g filter="url(#glow_baton)">
+        <rect x="68" y="50" width="10" height="36" rx="5" fill="#ef4444" stroke="rgba(0,0,0,.30)" stroke-width="3"/>
+        <rect x="68" y="64" width="10" height="8" rx="4" fill="rgba(255,255,255,.55)"/>
+      </g>
+    </g>
+  </svg>`;
+}
+
+    function safetyStaffPin(text){
+  // 안전요원(캡+선글라스) 캐릭터형 아이콘 (라벨은 별도)
+  return `
+    <div style="transform:translate(-22px,-50px); width:44px; height:56px;">
+      <div style="position:absolute; left:50%; top:0; transform:translateX(-50%);">
+        ${safetyStaffSvg(44,56)}
+      </div>
+    </div>`;
+}
+
+function safetyStaffSvg(w=44,h=56){
+  // ✅ 안전요원(운영도용 픽토그램): 모자/얼굴 제거 + "SECURITY" 표기
+  return `
+  <svg width="${w}" height="${h}" viewBox="0 0 88 112" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <defs>
+      <filter id="shadow_staff_s" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="rgba(0,0,0,.30)"/>
+      </filter>
+    </defs>
+
+    <g filter="url(#shadow_staff_s)">
+      <!-- head silhouette (no face, no hat) -->
+      <circle cx="44" cy="28" r="13" fill="#f5c7a9" stroke="rgba(0,0,0,.36)" stroke-width="4"/>
+
+      <!-- body -->
+      <rect x="26" y="44" width="36" height="50" rx="11" fill="#111827" stroke="rgba(0,0,0,.40)" stroke-width="4"/>
+      <rect x="28" y="56" width="32" height="16" rx="8" fill="rgba(255,255,255,.10)"/>
+
+      <text x="44" y="79" text-anchor="middle" font-family="system-ui, -apple-system, Arial" font-size="12" font-weight="900" fill="#ffffff" opacity="0.95">
+        SECURITY
+      </text>
+
+      <!-- arms -->
+      <path d="M20 56c-7 8-8 18-4 30" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+      <path d="M68 56c7 8 8 18 4 30" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+      <path d="M20 56c-7 8-8 18-4 30" stroke="rgba(255,255,255,.10)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M68 56c7 8 8 18 4 30" stroke="rgba(255,255,255,.10)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </svg>`;
+}
+
+    function markerIcon(kind,name){
+    const token = (String(name||"").split(" ")[0] || "S").slice(0,3);
+
+    if (kind==="parkingStaff" || kind==="staff") return parkingStaffPin(name || token);
+    if (kind==="safetyStaff") return safetyStaffPin(name || token);
+
+    // ✅ 행사 주차/교통 운영도용 입구·출구(문 아이콘 대신)
+    if (kind==="carIn") return signSvg("차량 진입 IN", "#16a34a", "#fff", "⬇");
+    if (kind==="carOut") return signSvg("차량 출차 OUT", "#111827", "#fff", "⬆");
+    if (kind==="control") return signSvg("통제", "#dc2626", "#fff", "⛔");
+    if (kind==="vipGate") return signSvg("관계자 입구", "#7c3aed", "#fff", "★");
+    if (kind==="gateIn") return signSvg("주차장 IN", "#0ea5e9", "#fff", "⬇");
+    if (kind==="gateOut") return signSvg("주차장 OUT", "#0ea5e9", "#fff", "⬆");
+    if (kind==="stage") return stagePin();
+
+    // legacy/others
+    return signSvg(token, "#2563eb", "#fff", "●");
+  }
+
+  
+  function markerContent(m){
+    const sc = currentScale || 1;
+    const rot = (m && typeof m.rotation==="number") ? m.rotation : 0;
+    return `<div style="transform:scale(${sc}) rotate(${rot}deg); transform-origin:0 0;">${markerIcon(m.kind,m.name)}</div>`;
+  }
+
+  function labelContent(m, autoDy=0, autoDx=0){
+    const sc = currentScale || 1;
+    const txt = (typeof m.labelText==="string" && m.labelText.trim()!=="") ? m.labelText : (m.name||"");
+
+    const isStaff = (m.kind==="staff" || m.kind==="parkingStaff" || m.kind==="safetyStaff");
+
+    // 기본 오프셋(픽셀, scale=1 기준). 사용자가 라벨을 드래그하면 labelDx/labelDy로 덮어씀.
+    let baseDx = isStaff ? 36 : 44;
+    let baseDy = isStaff ? -42 : -46;
+
+    // 표식별 기본 분산(겹침 완화)
+    if (m.kind==="carIn")  { baseDx = 44; baseDy = -58; }
+    if (m.kind==="carOut") { baseDx = 44; baseDy = -30; }
+    if (m.kind==="control"){ baseDx = 44; baseDy = -46; }
+    if (m.kind==="vipGate" || m.kind==="gateIn" || m.kind==="gateOut"){ baseDx = 44; baseDy = -46; }
+
+    const dx = (typeof m.labelDx==="number") ? m.labelDx : baseDx;
+    const dy = (typeof m.labelDy==="number") ? m.labelDy : baseDy;
+
+    const ml = dx + (autoDx||0);
+    const mt = dy + (autoDy||0);
+
+    return `<div style="transform:scale(${sc}); transform-origin:0 0; margin-left:${ml}px; margin-top:${mt}px; pointer-events:auto;">${markerLabelTag(txt, m.id)}</div>`;
+  }
+
+
+function refreshSubtypeOptions(){
+    const sel=document.getElementById("subtype");
+    sel.innerHTML="";
+    const add=(v,l)=>{ const o=document.createElement("option"); o.value=v; o.textContent=l; sel.appendChild(o); };
+    if (mode==="area"){
+      add("parking","주차장");
+      add("event","행사장");
+      add("vip","관계자주차장");
+    } else if (mode==="line"){
+      add("vehicle","차량 동선");
+      add("pedestrian","관람객 동선");
+      add("oneway","일방통행");
+      add("cone","라바콘");
+      add("tape","안전띠");
+      add("block","차량진입 금지/차단");
+      add("route","기타 경로");
+    } else {
+      add("parkingStaff","주차관리원");
+      add("safetyStaff","안전요원");
+      add("carIn","차량 진입(IN)");
+      add("carOut","차량 출차(OUT)");
+      add("control","통제(차단/검문)");
+      add("vipGate","관계자 입구");
+      add("gateIn","주차장 IN");
+      add("gateOut","주차장 OUT");
+      add("stage","무대");
+    }
+    if ([...sel.options].some(o=>o.value===subtype)) sel.value=subtype;
+    else { subtype=sel.options[0].value; sel.value=subtype; }
+    document.getElementById("parkingPick").innerHTML = buildParkingOptionsHtml();
+  }
+
+
+  function defaultAreaColor(kind){
+    if (kind==="event") return "#f97316";
+    if (kind==="vip") return "#facc15";
+    return "#22c55e";
+  }
+  function defaultLineColor(kind){
+    if (kind==="vehicle") return "#f97316";
+    if (kind==="pedestrian") return "#2563eb";
+    if (kind==="oneway") return "#ef4444";
+    if (kind==="cone") return "#f59e0b";
+    if (kind==="tape") return "#111827";
+    if (kind==="block") return "#dc2626";
+    if (kind==="route") return "#ef4444";
+    return "#ef4444";
+  }
+  function updateStyleColorUI(){
+    const picker=document.getElementById("styleColor");
+    const hint=document.getElementById("styleColorHint");
+    const reset=document.getElementById("styleColorReset");
+    const applyAll=document.getElementById("styleColorApplyAll");
+    if(!picker||!hint||!reset||!applyAll) return;
+    const enabled = (mode==="area" || mode==="line");
+    picker.disabled = !enabled;
+    reset.disabled = !enabled;
+    applyAll.disabled = !enabled;
+    picker.style.opacity = enabled ? "1" : ".45";
+    if(!enabled){ hint.textContent="구역/선에서만 변경"; return; }
+
+    if(mode==="area"){
+      const kind=subtype;
+      const v = layer.styleOverrides.area[kind] || defaultAreaColor(kind);
+      picker.value = v;
+      hint.textContent = "구역 색상";
+    } else {
+      const kind=subtype;
+      const v = layer.styleOverrides.line[kind] || defaultLineColor(kind);
+      picker.value = v;
+      hint.textContent = "선 색상";
+    }
+  }
+  function applyStyleColor(val){
+    if(!(mode==="area"||mode==="line")) return;
+    if(mode==="area"){
+      layer.styleOverrides.area[subtype]=val;
+      // 기존 구역만 즉시 반영
+      DATA.areas.forEach(a=>{
+        if(a.kind!==subtype) return;
+        const ov=overlays.areas.get(a.id); if(!ov) return;
+        const st=areaStyle(a.kind);
+        ov.poly.setOptions({ fillColor: st.fill, strokeColor: st.stroke, fillOpacity: st.fillOpacity });
+      });
+    } else {
+      layer.styleOverrides.line[subtype]=val;
+      DATA.lines.forEach(l=>{
+        if(l.kind!==subtype) return;
+        const ov=overlays.lines.get(l.id); if(!ov) return;
+        const st=lineStyle(l.kind);
+        ov.line.setOptions({ strokeColor: st.color, strokeWeight: st.w, strokeStyle: st.style, strokeOpacity: st.op });
+        decorateLine(l);
+      });
+    }
+  }
+
+  function applyStyleColorAll(val){
+    if(!(mode==="area"||mode==="line")) return;
+    if(mode==="area"){
+      // 모든 구역 타입에 동일 색 적용
+      ["parking","event","vip"].forEach(k=> layer.styleOverrides.area[k]=val);
+      DATA.areas.forEach(a=>{
+        const ov=overlays.areas.get(a.id); if(!ov) return;
+        const st=areaStyle(a.kind);
+        ov.poly.setOptions({ fillColor: st.fill, strokeColor: st.stroke, fillOpacity: st.fillOpacity });
+      });
+    } else {
+      // 모든 '주요' 선 타입(차량/관람객/일방/기타)에 동일 색 적용
+      ["vehicle","pedestrian","oneway","route"].forEach(k=> layer.styleOverrides.line[k]=val);
+      DATA.lines.forEach(l=>{
+        const ov=overlays.lines.get(l.id); if(!ov) return;
+        const st=lineStyle(l.kind);
+        ov.line.setOptions({ strokeColor: st.color, strokeWeight: st.w, strokeStyle: st.style, strokeOpacity: st.op });
+        decorateLine(l);
+      });
+    }
+    toast("전체 일괄 적용");
+  }
+  function resetStyleColor(){
+    if(!(mode==="area"||mode==="line")) return;
+    if(mode==="area"){ delete layer.styleOverrides.area[subtype]; }
+    else { delete layer.styleOverrides.line[subtype]; }
+    updateStyleColorUI();
+    applyStyleColor(document.getElementById("styleColor").value);
+  }
+
+
+  function buildParkingOptionsHtml(){
+    const parks = DATA.areas.filter(a=>a.kind==="parking").map(a=>a.name);
+    const opts = parks.length ? parks : ["(주차장 구역 먼저 생성)"];
+    return opts.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  }
+
+  function setOverlayVisible(ov, visible){
+    if (!ov) return;
+    try{
+      if (ov.poly) ov.poly.setMap(visible ? map : null);
+      if (ov.line) ov.line.setMap(visible ? map : null);
+      if (ov.marker) ov.marker.setMap(visible ? map : null);
+      if (ov.label) ov.label.setMap(visible ? map : null);
+      if (ov.deco) ov.deco.forEach(m=> m.setMap(visible ? map : null));
+    }catch(e){}
+  }
+
+  function clearAllOverlays(){
+    for (const [id,ov] of overlays.areas){ try{ ov.poly?.setMap(null); ov.label?.setMap(null);}catch(e){} }
+    for (const [id,ov] of overlays.lines){
+      try{ ov.line?.setMap(null);}catch(e){}
+      try{ (ov.deco||[]).forEach(m=>m.setMap(null)); }catch(e){}
+    }
+    for (const [id,ov] of overlays.markers){
+      try{ ov.marker?.setMap(null);}catch(e){}
+      try{ ov.label?.setMap(null);}catch(e){}
+    }
+    overlays.areas.clear(); overlays.lines.clear(); overlays.markers.clear();
+  }
+
+  function drawArea(a){
+    const st = areaStyle(a.kind);
+    const poly = new naver.maps.Polygon({
+      map: layer.areas ? map : null,
+      paths: [a.path.map(p=> new naver.maps.LatLng(p.lat,p.lng))],
+      fillColor: st.fill,
+      fillOpacity: st.fillOpacity,
+      strokeColor: st.stroke,
+      strokeOpacity: 0.9,
+      strokeWeight: st.w
+    });
+
+    const c = centroid(a.path);
+    const label = new naver.maps.Marker({
+      map: layer.areas ? map : null,
+      position: new naver.maps.LatLng(c.lat,c.lng),
+      clickable:false,
+      zIndex: 999,
+      icon: { content: labelTag(a.name), anchor: new naver.maps.Point(0,0) }
+    });
+
+    overlays.areas.set(a.id, {poly, label});
+  }
+
+  function clearLineDeco(id){
+    const ov = overlays.lines.get(id);
+    if (!ov) return;
+    (ov.deco||[]).forEach(m=>{ try{ m.setMap(null);}catch(e){} });
+    ov.deco = [];
+  }
+
+  function angleDegByScreen(p0, p1){
+    const proj = map.getProjection();
+    const A = proj.fromCoordToOffset(new naver.maps.LatLng(p0.lat, p0.lng));
+    const B = proj.fromCoordToOffset(new naver.maps.LatLng(p1.lat, p1.lng));
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    return Math.atan2(dy, dx) * 180 / Math.PI;
+  }
+
+  function placeArrowAt(latlng, angleDeg, big=false, color="#ef4444"){
+    const size = (big ? 28 : 22) * (currentScale||1);
+    // SVG 화살표(폰트/OS 영향 없이 선 방향과 정렬이 안정적)
+    const svg = `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="display:block">
+        <path d="M4 12h12" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+        <path d="M13 6l7 6-7 6" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    return new naver.maps.Marker({
+      map: layer.lines ? map : null,
+      position: latlng,
+      clickable:false,
+      zIndex: 720,
+      icon: {
+        content: `<div style="transform:translate(${ -size/2 }px,${ -size/2 }px) rotate(${angleDeg}deg); transform-origin:50% 50%; filter:drop-shadow(0 6px 14px rgba(0,0,0,.25));">${svg}</div>`,
+        anchor: new naver.maps.Point(0,0)
+      }
+    });
+  }
+
+
+  function decorateLine(l){
+    const ov = overlays.lines.get(l.id);
+    if (!ov) return;
+    clearLineDeco(l.id);
+
+    const pts = l.path;
+    if (!pts || pts.length < 2) return;
+
+    const spacingArrow = Math.max(10, Math.min(200, parseInt(document.getElementById("arrowSpacing").value || "40", 10)));
+    let spacingCone = Math.max(2, Math.min(50, parseInt(document.getElementById("coneSpacing").value || "7", 10)));
+
+    const length = lineLength(pts);
+
+    const MAX_MARKERS = 220;
+    if (l.kind === "cone"){
+      const est = Math.ceil(length / spacingCone) + 1;
+      if (est > MAX_MARKERS){
+        spacingCone = Math.ceil(length / MAX_MARKERS);
+      }
+    }
+
+    function pointAt(dist){
+      let d=0;
+      for(let i=1;i<pts.length;i++){
+        const seg = haversine(pts[i-1], pts[i]);
+        if (d+seg >= dist){
+          const t = (dist-d)/seg;
+          return { lat: pts[i-1].lat + (pts[i].lat-pts[i-1].lat)*t, lng: pts[i-1].lng + (pts[i].lng-pts[i-1].lng)*t, i };
+        }
+        d += seg;
+      }
+      return { lat: pts[pts.length-1].lat, lng: pts[pts.length-1].lng, i: pts.length-1 };
+    }
+
+    if (l.kind === "cone"){
+      const mid = pointAt(length*0.5);
+      ov.deco.push(new naver.maps.Marker({
+        map: layer.lines ? map : null,
+        position: new naver.maps.LatLng(mid.lat, mid.lng),
+        clickable:false,
+        zIndex: 810,
+        icon: { content: labelTag("라바콘"), anchor:new naver.maps.Point(0,0) }
+      }));
+
+      for (let d=0; d<=length; d+=spacingCone){
+        const p = pointAt(d);
+        ov.deco.push(new naver.maps.Marker({
+          map: layer.lines ? map : null,
+          position: new naver.maps.LatLng(p.lat, p.lng),
+          clickable:false,
+          zIndex: 650,
+          icon: { content: `<div style="transform:translate(-8px,-8px);">${coneSvg(16*(currentScale||1))}</div>`, anchor: new naver.maps.Point(0,0) }
+        }));
+      }
+    }
+
+    
+if (l.kind === "tape"){
+  // SECURITY LINE 연속 안전띠: 작은 타일을 촘촘하게 겹쳐서 "끊김 없는 띠"처럼 보이게 렌더
+  // (선 방향에 맞춰 회전)
+  const mid = pointAt(length*0.5);
+  ov.deco.push(new naver.maps.Marker({
+    map: layer.lines ? map : null,
+    position: new naver.maps.LatLng(mid.lat, mid.lng),
+    clickable:false,
+    zIndex: 810,
+    icon: { content: labelTag("SECURITY LINE"), anchor:new naver.maps.Point(0,0) }
+  }));
+
+  // 촘촘하게: 거리 기준이지만, 타일 폭을 넉넉히 해서 겹치도록 처리
+  let spacing = Math.max(2.5, Math.min(12, parseFloat(document.getElementById("coneSpacing").value || "6")));
+  const est = Math.ceil(length / spacing) + 1;
+  const finalSpacing = (est > MAX_MARKERS) ? (length / MAX_MARKERS) : spacing;
+
+  for (let d=0; d<=length; d+=finalSpacing){
+    const p = pointAt(d);
+    const segStart = pts[Math.max(0, p.i - 1)];
+    const segEnd   = pts[Math.min(pts.length - 1, p.i)];
+    const ang = angleDegByScreen(segStart, segEnd);
+    const w = 150*(currentScale||1);   // 넉넉한 폭(겹치게)
+    const h = 7*(currentScale||1);
+    ov.deco.push(new naver.maps.Marker({
+      map: layer.lines ? map : null,
+      position: new naver.maps.LatLng(p.lat, p.lng),
+      clickable:false,
+      zIndex: 660,
+      icon: { content: `<div style="transform:translate(-${w/2}px,-${h/2}px) rotate(${ang}deg);transform-origin:center;">${tapeSvg(w,h)}</div>`, anchor:new naver.maps.Point(0,0) }
+    }));
+  }
+}
+
+
+    if (l.kind === "block"){
+      // 차량진입 금지/차단: 선은 숨기고(Polyline opacity=0), ⛔ 아이콘만 라바콘처럼 반복 배치
+      let spacing = 14; // meters
+      const est = Math.ceil(length / spacing) + 1;
+      const finalSpacing = (est > MAX_MARKERS) ? (length / MAX_MARKERS) : spacing;
+
+      for (let d=0; d<=length; d+=finalSpacing){
+        const p = pointAt(d);
+        ov.deco.push(new naver.maps.Marker({
+          map: layer.lines ? map : null,
+          position: new naver.maps.LatLng(p.lat, p.lng),
+          clickable:false,
+          zIndex: 950,
+          icon: { 
+            content: `<div style="width:22px;height:22px;border-radius:8px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;box-shadow:0 8px 18px rgba(0,0,0,.18);transform:translate(-11px,-11px);">⛔</div>`,
+            anchor: new naver.maps.Point(0,0)
+          }
+        }));
+      }
+      return; // block은 여기서 종료(추가 라벨/화살표 붙이지 않음)
+    }
+
+if (l.kind === "oneway"){
+      const startAngle = angleDegByScreen(pts[0], pts[1]);
+      const endAngle = angleDegByScreen(pts[pts.length-2], pts[pts.length-1]);
+
+      ov.deco.push(placeArrowAt(new naver.maps.LatLng(pts[pts.length-1].lat, pts[pts.length-1].lng), endAngle, true));
+      
+      const mid = pointAt(length*0.5);
+      ov.deco.push(new naver.maps.Marker({
+        map: layer.lines ? map : null,
+        position: new naver.maps.LatLng(mid.lat, mid.lng),
+        clickable:false,
+        zIndex: 810,
+        icon: { content: labelTag("일방통행"), anchor:new naver.maps.Point(0,0) }
+      }));
+    }
+
+
+    
+// 차량/관람객 동선: 시작(앞) 화살표만 표시 (끝 화살표 제거)
+if (l.kind === "vehicle" || l.kind === "pedestrian"){
+  const c = (l.kind==="vehicle") ? "#f97316" : "#2563eb";
+  const endAngle = angleDegByScreen(pts[pts.length-2], pts[pts.length-1]);
+  ov.deco.push(placeArrowAt(new naver.maps.LatLng(pts[pts.length-1].lat, pts[pts.length-1].lng), endAngle, true, c));
+}
+
+// 기타 동선 라벨(구분용)
+    if (l.kind === "vehicle" || l.kind === "pedestrian" || l.kind === "route"){
+      const mid = pointAt(length*0.5);
+      const label = (l.kind==="vehicle") ? "🚗 차량 동선"
+                   : (l.kind==="pedestrian") ? "👣 관람객 동선"
+                   : "동선";
+      ov.deco.push(new naver.maps.Marker({
+        map: layer.lines ? map : null,
+        position: new naver.maps.LatLng(mid.lat, mid.lng),
+        clickable:false,
+        zIndex: 810,
+        icon: { content: labelTag(label), anchor:new naver.maps.Point(0,0) }
+      }));
+    }
+
+  }
+
+  function drawLine(l){
+    const st = lineStyle(l.kind);
+    const line = new naver.maps.Polyline({
+      map: layer.lines ? map : null,
+      path: l.path.map(p=> new naver.maps.LatLng(p.lat,p.lng)),
+      strokeColor: st.color,
+      strokeOpacity: st.op,
+      strokeWeight: st.w,
+      strokeStyle: st.style
+    });
+    overlays.lines.set(l.id, {line, deco:[]});
+    decorateLine(l);
+  }
+
+  function drawMarker(m){
+    const marker = new naver.maps.Marker({
+      map: layer.markers ? map : null,
+      position: new naver.maps.LatLng(m.lat,m.lng),
+      draggable:true,
+      title:m.name,
+      zIndex: 1200,
+      icon: { content: markerContent(m), anchor: new naver.maps.Point(0,0) }
+    });
+
+
+    // 라벨 겹침 완화: 같은 화면 구역(그리드)에 있으면 위로 스태킹
+    let stackDy = 0;
+    try{
+      const proj = map.getProjection();
+      const o = proj.fromCoordToOffset(marker.getPosition());
+      const key = `${Math.round(o.x/60)}_${Math.round(o.y/60)}`;
+      const idx = labelBuckets.get(key) || 0;
+      labelBuckets.set(key, idx + 1);
+      stackDy = -18 * idx;
+    }catch(e){ stackDy = 0; }
+
+    // 라벨: 모든 마커에 대해 생성(켜고/끄기 가능) + 내용(labelText) 별도
+    const showLabel = layer.markers && layer.markerLabels && (m.labelVisible!==false);
+    const label = new naver.maps.Marker({
+      map: showLabel ? map : null,
+      draggable:true,
+      position: (typeof m.labelLat==="number" && typeof m.labelLng==="number") ? new naver.maps.LatLng(m.labelLat, m.labelLng) : marker.getPosition(),
+      clickable:true,
+      draggable:true,
+      zIndex: 1100,
+      icon: { content: labelContent(m, stackDy, 0), anchor:new naver.maps.Point(0,0) }
+    });
+
+    naver.maps.Event.addListener(marker, "drag", ()=>{
+      try{ label.setPosition(marker.getPosition()); }catch(e){}
+    });
+
+    // 라벨만 이동(드래그): 라벨 위치를 별도로 저장
+    naver.maps.Event.addListener(label, "dragend", ()=>{
+      pushHistory();
+      const pos = label.getPosition();
+      m.labelLat = pos.lat();
+      m.labelLng = pos.lng();
+      setTextarea();
+    });
+
+
+    naver.maps.Event.addListener(marker, "dragend", ()=>{
+      pushHistory();
+      const pos = marker.getPosition();
+      m.lat = pos.lat(); m.lng = pos.lng();
+      setTextarea();
+    });
+
+    
+    // 라벨 드래그(라벨만 이동): 드래그 종료 시 마커 기준 오프셋(px) 저장
+    naver.maps.Event.addListener(label, "dragend", ()=>{
+      try{
+        const proj = map.getProjection();
+        const oM = proj.fromCoordToOffset(marker.getPosition());
+        const oL = proj.fromCoordToOffset(label.getPosition());
+        const sc = (currentScale || 1);
+        const dx = (oL.x - oM.x) / sc;
+        const dy = (oL.y - oM.y) / sc;
+
+        pushHistory();
+        m.labelDx = Math.round(dx);
+        m.labelDy = Math.round(dy);
+        m.labelManual = true;
+
+        // 라벨은 항상 마커 위치에 붙이고(추적), 오프셋으로만 이동
+        label.setPosition(marker.getPosition());
+        label.setIcon({ content: labelContent(m, stackDy, 0), anchor:new naver.maps.Point(0,0) });
+
+        setTextarea();
+        renderSavedList(false);
+        toast("라벨 위치 저장");
+      }catch(e){}
+    });
+
+    overlays.markers.set(m.id, {marker,label, stackDy});
+
+  }
+
+  
+  function recomputeLabelStacks(){
+    // 라벨 겹침 완화: 가까운 화면 위치에 있는 라벨들을 자동으로 위/아래로 분산
+    try{
+      if(!map) return;
+      const proj = map.getProjection();
+      if(!proj) return;
+
+      // 버킷(픽셀) 단위로 그룹핑
+      const buckets = new Map();
+      const bucketW = 140, bucketH = 90;
+
+      for(const m of DATA.markers){
+        if(m.labelVisible===false) continue;
+        if(!(layer.markers && layer.markerLabels)) continue;
+
+        // 사용자가 직접 옮긴 라벨은 자동 스태킹에서 제외
+        if(m.labelManual) continue;
+
+        const pos = new naver.maps.LatLng(m.lat, m.lng);
+        const o = proj.fromCoordToOffset(pos);
+        const key = `${Math.round(o.x/bucketW)}_${Math.round(o.y/bucketH)}`;
+        if(!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(m);
+      }
+
+      for(const [key, list] of buckets){
+        // 항상 일정한 순서로
+        list.sort((a,b)=> (a.id>b.id?1:-1));
+        const n = list.length;
+        for(let i=0;i<n;i++){
+          const m = list[i];
+          const ov = overlays.markers.get(m.id);
+          if(!ov?.label) continue;
+          const dy = (i - (n-1)/2) * 30; // 30px 간격
+          const dx = (i%2===0 ? 0 : 70) * (i%4<2 ? 1 : -1); // 좌우 분산
+          ov.stackDy = dy;
+          try{
+            ov.label.setIcon({ content: labelContent(m, dy, dx), anchor:new naver.maps.Point(0,0) });
+          }catch(e){}
+        }
+      }
+    }catch(e){}
+  }
+function removeItem(tabName,id){
+    if (tabName==="areas"){
+      const i=DATA.areas.findIndex(x=>x.id===id); if(i>=0) DATA.areas.splice(i,1);
+      const ov=overlays.areas.get(id);
+      if(ov){ try{ ov.poly?.setMap(null); ov.label?.setMap(null);}catch(e){} overlays.areas.delete(id); }
+    } else if (tabName==="lines"){
+      const i=DATA.lines.findIndex(x=>x.id===id); if(i>=0) DATA.lines.splice(i,1);
+      const ov=overlays.lines.get(id);
+      if(ov){
+        try{ ov.line?.setMap(null);}catch(e){}
+        try{ (ov.deco||[]).forEach(m=>m.setMap(null)); }catch(e){}
+        overlays.lines.delete(id);
+      }
+    } else {
+      const i=DATA.markers.findIndex(x=>x.id===id); if(i>=0) DATA.markers.splice(i,1);
+      const ov=overlays.markers.get(id);
+      if(ov){ try{ ov.marker?.setMap(null); ov.label?.setMap(null);}catch(e){} overlays.markers.delete(id); }
+    }
+  }
+
+  function redrawAll(){
+    clearAllOverlays();
+    document.getElementById("projTitle").value = DATA.meta?.title || "";
+    DATA.areas.forEach(drawArea);
+    DATA.lines.forEach(drawLine);
+    labelBuckets = new Map();
+    DATA.markers.forEach(drawMarker);
+    recomputeLabelStacks();
+    document.getElementById("parkingPick").innerHTML = buildParkingOptionsHtml();
+    setTextarea();
+    renderSavedList();
+    updateUndoRedoButtons();
+  }
+
+  function snapLatLng(latlng){
+    if (!layer.snap) return latlng;
+    const proj = map.getProjection();
+    const p = proj.fromCoordToOffset(latlng);
+    const thr=14;
+    let best=null, bestD2=thr*thr;
+
+    function testPoint(pt){
+      const o=proj.fromCoordToOffset(new naver.maps.LatLng(pt.lat, pt.lng));
+      const dx=o.x-p.x, dy=o.y-p.y;
+      const d2=dx*dx+dy*dy;
+      if(d2<bestD2){ bestD2=d2; best=pt; }
+    }
+    if (layer.areas) DATA.areas.forEach(a=>a.path.forEach(testPoint));
+    if (layer.lines) DATA.lines.forEach(l=>l.path.forEach(testPoint));
+    if (best) return new naver.maps.LatLng(best.lat, best.lng);
+    return latlng;
+  }
+
+  function clearTemp(){
+    tempPoints=[];
+    if(tempLine){ try{ tempLine.setMap(null);}catch(e){} tempLine=null; }
+  }
+  function redrawTemp(){
+    if(tempLine){ try{ tempLine.setMap(null);}catch(e){} }
+    if(!tempPoints.length){ tempLine=null; return; }
+    tempLine = new naver.maps.Polyline({
+      map,
+      path: tempPoints.map(p=> new naver.maps.LatLng(p.lat,p.lng)),
+      strokeColor:"#111827", strokeOpacity:0.5, strokeWeight:3, strokeStyle:"shortdash"
+    });
+  }
+
+  function setMode(m){
+    mode=m;
+    clearTemp();
+    document.getElementById("modeArea").classList.toggle("primary", m==="area");
+    document.getElementById("modeLine").classList.toggle("primary", m==="line");
+    document.getElementById("modeMarker").classList.toggle("primary", m==="marker");
+    refreshSubtypeOptions();
+    updateStyleColorUI();
+  }
+
+  function setTab(t){
+    tab=t;
+    selected=null;
+    stopEditing();
+    document.getElementById("tabAreas").classList.toggle("primary", t==="areas");
+    document.getElementById("tabLines").classList.toggle("primary", t==="lines");
+    document.getElementById("tabMarkers").classList.toggle("primary", t==="markers");
+    renderSavedList();
+  }
+
+  function pendingStart(obj){
+    pending=obj;
+    document.getElementById("pendingSave").disabled=false;
+    document.getElementById("pendingCancel").disabled=false;
+    document.getElementById("pendingHint").textContent="이름 입력 후 저장";
+    document.getElementById("pendingName").value=obj.suggest||"";
+    document.getElementById("pendingName").focus();
+  }
+  function pendingClear(msg="대기중…"){
+    pending=null;
+    document.getElementById("pendingSave").disabled=true;
+    document.getElementById("pendingCancel").disabled=true;
+    document.getElementById("pendingHint").textContent=msg;
+    document.getElementById("pendingName").value="";
+  }
+  function commitPending(){
+    if(!pending) return;
+    const name=document.getElementById("pendingName").value.trim();
+    if(!name){ toast("이름을 입력해줘"); return; }
+    pushHistory();
+    const id=uid();
+    if(pending.mode==="area"){
+      const item={id,name,kind:pending.subtype,path:pending.points};
+      DATA.areas.push(item);
+      drawArea(item);
+      toast("구역 저장");
+    } else if (pending.mode==="line"){
+      const item={id,name,kind:pending.subtype,path:pending.points};
+      DATA.lines.push(item);
+      drawLine(item);
+      toast("선 저장");
+    } else {
+      const item={id,name,kind:pending.subtype,lat:pending.points[0].lat,lng:pending.points[0].lng, rotation:0, labelText:name};
+      DATA.markers.push(item);
+      drawMarker(item);
+      toast("마커 저장");
+    }
+    document.getElementById("parkingPick").innerHTML = buildParkingOptionsHtml();
+    setTextarea();
+    renderSavedList();
+    pendingClear("저장 완료");
+  }
+
+  function itemMeta(it){
+    if(tab==="areas") return `면적(대략): ${fmtArea(polygonArea(it.path))}`;
+    if(tab==="lines") return `길이(대략): ${fmtMeters(lineLength(it.path))}`;
+    return `(${it.lat.toFixed(6)}, ${it.lng.toFixed(6)})`;
+  }
+
+  function kindLabelForList(it){
+    if(!it) return "";
+    if(tab==="areas"){
+      if(it.kind==="parking") return "주차장";
+      if(it.kind==="event") return "행사장";
+      if(it.kind==="vip") return "관계자";
+      return "구역";
+    }
+    if(tab==="lines"){
+      if(it.kind==="vehicle") return "차량 동선";
+      if(it.kind==="pedestrian") return "관람객 동선";
+      if(it.kind==="block") return "차량진입 금지/차단";
+      if(it.kind==="oneway") return "일방통행";
+      if(it.kind==="cone") return "라바콘";
+      if(it.kind==="tape") return "SECURITY LINE";
+      if(it.kind==="route") return "기타 경로";
+      return "선";
+    }
+    // markers
+    if(it.kind==="parkingStaff") return "주차관리";
+    if(it.kind==="safetyStaff") return "안전요원";
+    if(it.kind==="carIn") return "차량 진입";
+    if(it.kind==="carOut") return "차량 출차";
+    if(it.kind==="control") return "통제";
+    if(it.kind==="vipGate") return "관계자 입구";
+    if(it.kind==="gateIn") return "주차장 IN";
+    if(it.kind==="gateOut") return "주차장 OUT";
+    if(it.kind==="stage") return "무대";
+    return "마커";
+  }
+
+  function displayNameForList(it){
+    const k = kindLabelForList(it);
+    const nm = String(it?.name||"").trim();
+    // 사용자가 '동선'처럼 포괄적으로 저장했어도 리스트에서는 종류가 우선 보이게
+    if(tab==="lines" && (nm==="" || nm==="동선" || nm==="라인" || nm==="경로")) return k || nm;
+    if(tab==="areas" && (nm==="" || nm==="구역")) return k || nm;
+    if(tab==="markers" && (nm==="" || nm==="마커")) return k || nm;
+    return k ? `${k} · ${nm}` : nm;
+  }
+
+  function kindPillHtml(it){
+    const k = kindLabelForList(it);
+    if(!k) return "";
+    return `<span class="pill" style="gap:6px;padding:3px 8px;font-size:11px;font-weight:900;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.92)">${esc(k)}</span>`;
+  }
+
+  function matchesSearch(name){
+    const q=document.getElementById("search").value.trim().toLowerCase();
+    if(!q) return true;
+    return String(name||"").toLowerCase().includes(q);
+  }
+
+  function setEditButtons(enabled){
+    const t=document.getElementById("editToggle");
+    if(t) t.disabled = !enabled;
+    document.getElementById("addPoint").disabled = !enabled;
+    document.getElementById("reverseLine").disabled = !enabled;
+    document.getElementById("fitSel").disabled = !enabled;
+    document.getElementById("applyDecor").disabled = !enabled;
+  }
+
+  function selectItem(id){
+    selected={tab,id};
+    const canEdit = (tab==="areas" || tab==="lines");
+    setEditButtons(canEdit || tab==="markers");
+    if(tab==="markers"){
+      document.getElementById("editToggle").disabled=true;
+      document.getElementById("addPoint").disabled=true;
+      document.getElementById("reverseLine").disabled=true;
+      
+    }
+    fitSelected();
+    flashSelected();
+  }
+
+  function flashSelected(){
+    if(!selected) return;
+    if(selected.tab==="areas"){
+      const ov=overlays.areas.get(selected.id); if(!ov) return;
+      const w=ov.poly.getOptions().strokeWeight || 3;
+      ov.poly.setOptions({strokeWeight:w+3});
+      setTimeout(()=>ov.poly.setOptions({strokeWeight:w}), 350);
+    } else if (selected.tab==="lines"){
+      const ov=overlays.lines.get(selected.id); if(!ov) return;
+      const w=ov.line.getOptions().strokeWeight || 5;
+      ov.line.setOptions({strokeWeight:w+3});
+      setTimeout(()=>ov.line.setOptions({strokeWeight:w}), 350);
+    } else {
+      const ov=overlays.markers.get(selected.id); if(!ov) return;
+      ov.marker.setAnimation(naver.maps.Animation.BOUNCE);
+      setTimeout(()=>ov.marker.setAnimation(null), 450);
+    }
+  }
+
+  function fitSelected(){
+    if(!selected) return;
+    const b=new naver.maps.LatLngBounds();
+    if(selected.tab==="areas"){
+      const it=DATA.areas.find(x=>x.id===selected.id); if(!it) return;
+      it.path.forEach(p=>b.extend(new naver.maps.LatLng(p.lat,p.lng)));
+    } else if (selected.tab==="lines"){
+      const it=DATA.lines.find(x=>x.id===selected.id); if(!it) return;
+      it.path.forEach(p=>b.extend(new naver.maps.LatLng(p.lat,p.lng)));
+    } else {
+      const it=DATA.markers.find(x=>x.id===selected.id); if(!it) return;
+      b.extend(new naver.maps.LatLng(it.lat,it.lng));
+    }
+    if(!b.isEmpty()) map.fitBounds(b);
+  }
+
+  function stopEditing(){
+    editing=false;
+    addPointMode=false;
+    vertexMarkers.forEach(m=>{ try{ m.setMap(null);}catch(e){} });
+    vertexMarkers=[];
+    document.getElementById("addPoint").textContent="점 추가(OFF)";
+  
+    const t=document.getElementById("editToggle");
+    if(t) t.textContent="편집 시작";
+  }
+  function getSelectedItem(){
+    if(!selected) return null;
+    if(selected.tab==="areas") return DATA.areas.find(x=>x.id===selected.id);
+    if(selected.tab==="lines") return DATA.lines.find(x=>x.id===selected.id);
+    if(selected.tab==="markers") return DATA.markers.find(x=>x.id===selected.id);
+    return null;
+  }
+  function startEditing(){
+    if(!selected || !(selected.tab==="areas" || selected.tab==="lines")) return;
+    editing=true;
+    addPointMode=false;
+    buildVertexMarkers();
+    const t=document.getElementById("editToggle"); if(t) t.textContent="편집 종료";
+    toast("편집 시작(점 드래그)");
+  }
+  function toggleAddPoint(){
+    if(!editing) return;
+    addPointMode=!addPointMode;
+    document.getElementById("addPoint").textContent = addPointMode ? "점 추가(ON)" : "점 추가(OFF)";
+  }
+  function buildVertexMarkers(){
+    vertexMarkers.forEach(m=>{ try{ m.setMap(null);}catch(e){} });
+    vertexMarkers=[];
+    const it=getSelectedItem();
+    if(!it || !it.path) return;
+
+    it.path.forEach((p,idx)=>{
+      const mk=new naver.maps.Marker({
+        map,
+        position:new naver.maps.LatLng(p.lat,p.lng),
+        draggable:true,
+        zIndex: 1000,
+        icon:{ content:`<div style="width:14px;height:14px;border-radius:6px;background:#111827;border:2px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.25)"></div>`, anchor:new naver.maps.Point(7,7) }
+      });
+      naver.maps.Event.addListener(mk,"dragend",()=>{
+        pushHistory();
+        const pos=mk.getPosition();
+        it.path[idx] = {lat:pos.lat(), lng:pos.lng()};
+        applyPath(it);
+        setTextarea();
+        renderSavedList(false);
+      });
+      vertexMarkers.push(mk);
+    });
+  }
+
+  function applyPath(it){
+    if(selected.tab==="lines"){
+      const ov=overlays.lines.get(it.id); if(!ov) return;
+      ov.line.setPath(it.path.map(p=>new naver.maps.LatLng(p.lat,p.lng)));
+      decorateLine(it);
+    } else if (selected.tab==="areas"){
+      const ov=overlays.areas.get(it.id); if(!ov) return;
+      ov.poly.setPaths([it.path.map(p=>new naver.maps.LatLng(p.lat,p.lng))]);
+      const c=centroid(it.path);
+      ov.label.setPosition(new naver.maps.LatLng(c.lat,c.lng));
+    }
+  }
+
+  function insertPointAtClick(latlng){
+    if(!editing || !addPointMode) return;
+    const it=getSelectedItem();
+    if(!it || !it.path || it.path.length<2) return;
+
+    pushHistory();
+
+    const proj=map.getProjection();
+    const click=proj.fromCoordToOffset(latlng);
+
+    function d2seg(P,A,B){
+      const ax=A.x, ay=A.y, bx=B.x, by=B.y, px=P.x, py=P.y;
+      const vx=bx-ax, vy=by-ay, wx=px-ax, wy=py-ay;
+      const c1=vx*wx+vy*wy;
+      if(c1<=0) return (px-ax)**2+(py-ay)**2;
+      const c2=vx*vx+vy*vy;
+      if(c2<=c1) return (px-bx)**2+(py-by)**2;
+      const t=c1/c2;
+      const cx=ax+t*vx, cy=ay+t*vy;
+      return (px-cx)**2+(py-cy)**2;
+    }
+
+    let bestIdx=0, bestD=Infinity;
+    for(let i=0;i<it.path.length-1;i++){
+      const A=proj.fromCoordToOffset(new naver.maps.LatLng(it.path[i].lat,it.path[i].lng));
+      const B=proj.fromCoordToOffset(new naver.maps.LatLng(it.path[i+1].lat,it.path[i+1].lng));
+      const d=d2seg(click,A,B);
+      if(d<bestD){ bestD=d; bestIdx=i; }
+    }
+
+    if(selected.tab==="areas" && it.path.length>=3){
+      const A=proj.fromCoordToOffset(new naver.maps.LatLng(it.path[it.path.length-1].lat,it.path[it.path.length-1].lng));
+      const B=proj.fromCoordToOffset(new naver.maps.LatLng(it.path[0].lat,it.path[0].lng));
+      const d=d2seg(click,A,B);
+      if(d<bestD){ bestD=d; bestIdx=it.path.length-1; }
+    }
+
+    const p={lat:latlng.lat(), lng:latlng.lng()};
+    if(bestIdx===it.path.length-1) it.path.push(p);
+    else it.path.splice(bestIdx+1,0,p);
+
+    applyPath(it);
+    setTextarea();
+    buildVertexMarkers();
+    renderSavedList(false);
+  }
+
+  function reverseSelectedLine(){
+    if(!selected || selected.tab!=="lines") return;
+    const it=getSelectedItem(); if(!it) return;
+    pushHistory();
+    it.path.reverse();
+    applyPath(it);
+    setTextarea();
+    renderSavedList(false);
+  }
+
+  function applyDecorSelected(){
+    if(!selected || selected.tab!=="lines") return;
+    const it=getSelectedItem(); if(!it) return;
+    decorateLine(it);
+    toast("적용");
+  }
+
+  function renderSavedList(restoreScroll=true){
+    const box=document.getElementById("savedList");
+    const prev=box.scrollTop;
+
+    let arr=[];
+    if(tab==="areas") arr=DATA.areas;
+    if(tab==="lines") arr=DATA.lines;
+    if(tab==="markers") arr=DATA.markers;
+
+    const filtered = arr.filter(it=>matchesSearch(it.name));
+    box.innerHTML="";
+    if(!filtered.length){
+      box.innerHTML=`<div class="muted">항목이 없습니다(또는 검색 결과 없음).</div>`;
+      return;
+    }
+
+    filtered.forEach(it=>{
+      const div=document.createElement("div");
+      div.className="item";
+      div.innerHTML=`
+        <div class="left">
+          <div class="name" data-edit="name" title="클릭해서 이름 수정">${kindPillHtml(it)} <span>${esc(displayNameForList(it))}</span></div>
+          <div class="meta">${esc(itemMeta(it))}</div>
+          ${tab==="markers" ? `<div class="meta">라벨: <span data-edit="label" style="font-weight:900;cursor:pointer">${esc((it.labelText!=null && String(it.labelText).trim()!=="")?it.labelText:it.name)}</span> <label style="margin-left:10px;cursor:pointer;font-size:12px;"><input type="checkbox" data-act="labelToggle" ${it.labelVisible!==false?"checked":""}/>표시</label></div>` : ``}
+        </div>
+        <div class="btns">
+          <button data-act="sel">선택</button>
+          ${tab==="markers" ? `<button data-act="rotL">↺</button><button data-act="rotR">↻</button>` : ``}
+          <button data-act="del" class="danger">삭제</button>
+        </div>
+      `;
+
+      div.querySelector('[data-edit="name"]').onclick=()=>{
+        const nameEl=div.querySelector('[data-edit="name"]');
+        const cur=it.name;
+        const input=document.createElement("input");
+        input.className="rename";
+        input.value=cur;
+        nameEl.replaceWith(input);
+        input.focus(); input.select();
+
+        const commit=()=>{
+          const nv=input.value.trim();
+          if(nv && nv!==cur){
+            pushHistory();
+            it.name=nv;
+            if(tab==="areas"){
+              const ov=overlays.areas.get(it.id);
+              if(ov?.label) ov.label.setIcon({content: labelTag(it.name), anchor:new naver.maps.Point(0,0)});
+            } else if (tab==="markers"){
+              const ov=overlays.markers.get(it.id);
+              if(ov){
+                ov.marker.setIcon({content: `<div style="transform:scale(${currentScale||1}) rotate(${it.rotation||0}deg); transform-origin:0 0;">${markerIcon(it.kind, it.name)}</div>`, anchor:new naver.maps.Point(0,0)});
+                if(ov.label) ov.label.setIcon({
+                  content:(()=>{const txt=(it.labelText!=null&&String(it.labelText).trim()!=="")?it.labelText:it.name; const isStage=(it.kind==="stage"); const isSign=["carIn","carOut","control","vipGate","gateIn","gateOut"].includes(it.kind); const isStaff=["parkingStaff","safetyStaff","staff"].includes(it.kind); const ml=isStage?60:(isSign?92:(isStaff?74:82)); const mt=isStage?-60:(isSign?-72:-66); return `<div style="margin-left:${ml}px;margin-top:${mt}px;transform:scale(${currentScale});transform-origin:0 0;">${labelTag(txt)}</div>`;})(),
+                  anchor:new naver.maps.Point(0,0)
+                });
+              }
+            }
+            setTextarea();
+          }
+          renderSavedList(false);
+        };
+
+        input.onkeydown=(e)=>{
+          if(e.key==="Enter") commit();
+          if(e.key==="Escape") renderSavedList(false);
+        };
+        input.onblur=commit;
+      };
+
+
+      // 라벨 텍스트 편집(마커 탭)
+      if (tab==="markers"){
+        const labelEl = div.querySelector('[data-edit="label"]');
+        if (labelEl){
+          labelEl.onclick=()=>{
+            const cur = (it.labelText!=null?String(it.labelText):String(it.name));
+            const input=document.createElement("input");
+            input.className="rename";
+            input.value=cur;
+            labelEl.replaceWith(input);
+            input.focus(); input.select();
+
+            const commitLabel=()=>{
+              const nv=input.value.trim();
+              pushHistory();
+              it.labelText = nv;
+              const ov=overlays.markers.get(it.id);
+              if(ov?.label){
+                const isStage=(it.kind==="stage");
+                const isSign=["carIn","carOut","control","vipGate","gateIn","gateOut"].includes(it.kind);
+                const isStaff=["parkingStaff","safetyStaff","staff"].includes(it.kind);
+                const ml=isStage?60:(isSign?92:(isStaff?74:82));
+                const mt=isStage?-60:(isSign?-72:-66);
+                ov.label.setIcon({ content:`<div style="margin-left:${ml}px;margin-top:${mt}px;transform:scale(${currentScale});transform-origin:0 0;">${labelTag(nv||it.name)}</div>`, anchor:new naver.maps.Point(0,0) });
+              }
+              setTextarea();
+              renderSavedList(false);
+            };
+
+            input.onkeydown=(e)=>{
+              if(e.key==="Enter") commitLabel();
+              if(e.key==="Escape") renderSavedList(false);
+            };
+            input.onblur=commitLabel;
+          };
+        }
+
+
+// 라벨 표시(개별)
+const lblTgl = div.querySelector('[data-act="labelToggle"]');
+if(lblTgl){
+  lblTgl.onchange=()=>{
+    pushHistory();
+    it.labelVisible = !!lblTgl.checked;
+    const ov=overlays.markers.get(it.id);
+    if(ov?.label){
+      ov.label.setMap(layer.markerLabels && it.labelVisible ? map : null);
+    }
+    setTextarea();
+  };
+}
+
+// 회전
+
+        const rotL = div.querySelector('[data-act="rotL"]');
+        const rotR = div.querySelector('[data-act="rotR"]');
+        const applyRot = ()=>{
+          const ov=overlays.markers.get(it.id);
+          if(ov?.marker){
+            ov.marker.setIcon({ content:`<div style="transform:scale(${currentScale}) rotate(${it.rotation||0}deg); transform-origin:0 0;">${markerIcon(it.kind,it.name)}</div>`, anchor:new naver.maps.Point(0,0) });
+          }
+        };
+        if(rotL) rotL.onclick=()=>{ pushHistory(); it.rotation=(it.rotation||0)-15; applyRot(); setTextarea(); };
+        if(rotR) rotR.onclick=()=>{ pushHistory(); it.rotation=(it.rotation||0)+15; applyRot(); setTextarea(); };
+      }
+
+      div.querySelector('[data-act="sel"]').onclick=()=>selectItem(it.id);
+      div.querySelector('[data-act="del"]').onclick=()=>{
+        if(!confirm("삭제할까요?")) return;
+        pushHistory();
+        removeItem(tab, it.id);
+        selected=null;
+        setTextarea();
+        renderSavedList();
+        toast("삭제 완료");
+      };
+
+      const rotL = div.querySelector('[data-act="rotL"]');
+      const rotR = div.querySelector('[data-act="rotR"]');
+      if (rotL) rotL.onclick=()=>{
+        pushHistory();
+        if (typeof it.rotation !== "number") it.rotation = 0;
+        it.rotation -= 15;
+        const ov=overlays.markers.get(it.id);
+        if (ov?.marker){
+          ov.marker.setIcon({ content: markerContent(it), anchor:new naver.maps.Point(0,0) });
+        }
+        setTextarea();
+        toast("회전 -15°");
+      };
+      if (rotR) rotR.onclick=()=>{
+        pushHistory();
+        if (typeof it.rotation !== "number") it.rotation = 0;
+        it.rotation += 15;
+        const ov=overlays.markers.get(it.id);
+        if (ov?.marker){
+          ov.marker.setIcon({ content: markerContent(it), anchor:new naver.maps.Point(0,0) });
+        }
+        setTextarea();
+        toast("회전 +15°");
+      };
+
+
+      box.appendChild(div);
+    });
+
+    if(restoreScroll) box.scrollTop=prev;
+  }
+
+  function toggleIOWizard(){
+    const pick=document.getElementById("parkingPick").value;
+    if(!pick || pick.startsWith("(")){ toast("주차장 구역부터 만들어줘"); return; }
+    ioWizard.active=true; ioWizard.step=0; ioWizard.parkingName=pick;
+    toast("IN 위치 클릭");
+  }
+  function createGate(kind, name, latlng){
+    const id=uid();
+    const item={id, name, kind, lat:latlng.lat(), lng:latlng.lng(), rotation:0};
+    DATA.markers.push(item);
+    drawMarker(item);
+  }
+
+  function fitAll(){
+    const b=new naver.maps.LatLngBounds();
+    DATA.areas.forEach(a=>a.path.forEach(p=>b.extend(new naver.maps.LatLng(p.lat,p.lng))));
+    DATA.lines.forEach(l=>l.path.forEach(p=>b.extend(new naver.maps.LatLng(p.lat,p.lng))));
+    DATA.markers.forEach(m=>b.extend(new naver.maps.LatLng(m.lat,m.lng)));
+    if(!b.isEmpty()) map.fitBounds(b);
+  }
+
+  
+  function pillHtml(label, color){
+    return `<span class="pill"><span class="dot" style="background:${color}"></span>${esc(label)}</span>`;
+  }
+
+  function getLegendColorArea(kind){
+    return layer.styleOverrides?.area?.[kind] || defaultAreaColor(kind);
+  }
+  function getLegendColorLine(kind){
+    return layer.styleOverrides?.line?.[kind] || defaultLineColor(kind);
+  }
+
+  function refreshPrintLegend(){
+    const wrap = document.getElementById("plItems");
+    if(!wrap) return;
+    const items = [
+      {label:"주차장", color:getLegendColorArea("parking")},
+      {label:"행사장", color:getLegendColorArea("event")},
+      {label:"관계자주차장", color:getLegendColorArea("vip")},
+      {label:"라바콘", color:getLegendColorLine("cone")},
+      {label:"차량 동선", color:getLegendColorLine("vehicle")},
+      {label:"관람객 동선", color:getLegendColorLine("pedestrian")},
+      {label:"일방통행", color:getLegendColorLine("oneway")},
+      {label:"통제/차단", color:getLegendColorLine("block")},
+      {label:"근무자·입출구", color:"#2563eb"},
+    ];
+    wrap.innerHTML = items.map(i=>pillHtml(i.label, i.color)).join("");
+    document.getElementById("plTitle").textContent = DATA.meta?.title || "행사 주차·교통 운영도";
+  }
+function togglePrintMode(force){
+    const on = (typeof force === "boolean")
+      ? (force ? (document.body.classList.add("printmode"), true) : (document.body.classList.remove("printmode"), false))
+      : document.body.classList.toggle("printmode");
+    if(on){ try{ refreshPrintLegend(); }catch(e){} }
+    // 강제 레이아웃 복구(인쇄→편집)
+    const sideEl=document.getElementById('side');
+    const wrapEl=document.getElementById('wrap');
+    if(!on){
+      if(sideEl) sideEl.style.display='block';
+      if(wrapEl) wrapEl.style.gridTemplateColumns='1fr 420px';
+    } else {
+      if(sideEl) sideEl.style.display='none';
+      if(wrapEl) wrapEl.style.gridTemplateColumns='1fr';
+    }
+    setTimeout(()=>{ try{ naver.maps.Event.trigger(map, "resize"); }catch(e){} }, 50);
+
+    // 네이버 지도 리사이즈 보정
+    try{ setTimeout(()=> map && map.setSize && map.setSize(new naver.maps.Size(map.getElement().clientWidth, map.getElement().clientHeight)), 80); }catch(e){}
+    return on;
+  }
+
+  function loadAnyJson(obj){
+    if (obj && obj.areas && obj.lines && obj.markers){
+      DATA = obj;
+      DATA.meta = DATA.meta || { title:"행사 주차·교통 운영도", note:"" };
+      DATA.areas.forEach(a=>a.id=a.id||uid());
+      DATA.lines.forEach(l=>l.id=l.id||uid());
+      DATA.markers.forEach(m=>{m.id=m.id||uid(); if(typeof m.rotation!=="number") m.rotation=0;});
+      return;
+    }
+    if (obj && (obj.parking || obj.flow || obj.staff)){
+      const areas=(obj.parking||[]).map(p=>({id:uid(), name:p.name, kind:(p.name||"").includes("행사장")?"event":(p.name||"").includes("관계자")?"vip":"parking", path:p.path}));
+      const lines=(obj.flow||[]).map(f=>({id:uid(), name:f.name, kind:(f.name||"").includes("라바콘")?"cone":(f.name||"").includes("일방")?"oneway":(f.name||"").includes("차단")||(f.name||"").includes("금지")?"block":"route", path:f.path}));
+      const markers=(obj.staff||[]).map(s=>({id:uid(), name:s.name, kind:"staff", lat:s.lat, lng:s.lng, rotation:0}));
+      DATA={areas,lines,markers, meta:{ title:"행사 주차·교통 운영도", note:"" }};
+      migrateData();
+      return;
+    }
+    throw new Error("지원하지 않는 JSON 구조");
+  }
+
+  function initMap(){
+    map = new naver.maps.Map("map", {
+      center: new naver.maps.LatLng(CENTER.lat, CENTER.lng),
+      zoom: DEFAULT_ZOOM,
+      mapTypeId: naver.maps.MapTypeId.SATELLITE
+    });
+
+    // 라벨 인라인 편집/삭제(이벤트 위임)
+    const mapEl = document.getElementById("map");
+    mapEl.addEventListener("mousedown", (e)=>{
+      const label = e.target.closest?.(".mLabel");
+      if(label){ e.stopPropagation(); }
+    }, true);
+    // ===== 라벨 드래그(라벨만 이동) =====
+    let activeLabelDrag = null;
+    const getMarkerObjById = (id)=> DATA.markers.find(mm=>mm.id===id);
+
+    const setLabelManualOffset = (id, dx, dy)=>{
+      const mObj = getMarkerObjById(id);
+      if(!mObj) return;
+      mObj.labelDx = dx;
+      mObj.labelDy = dy;
+      mObj.labelManual = true;
+      const ov = overlays.markers.get(id);
+      if(ov?.label){
+        try{ ov.label.setIcon({ content: labelContent(mObj, ov.stackDy||0, 0), anchor:new naver.maps.Point(0,0) }); }catch(e){}
+      }
+    };
+
+    mapEl.addEventListener("mousedown", (e)=>{
+      const dragHandle = e.target.closest?.(".mDrag");
+      if(!dragHandle) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const label = dragHandle.closest(".mLabel");
+      const id = label?.dataset?.mid;
+      if(!id) return;
+      const mObj = getMarkerObjById(id);
+      if(!mObj) return;
+
+      const sc = currentScale || 1;
+      activeLabelDrag = {
+        id,
+        sc,
+        startX: e.clientX,
+        startY: e.clientY,
+        startDx: (typeof mObj.labelDx==="number") ? mObj.labelDx : undefined,
+        startDy: (typeof mObj.labelDy==="number") ? mObj.labelDy : undefined
+      };
+
+      // base defaults used in labelContent
+      const isStaff = (mObj.kind==="staff" || mObj.kind==="parkingStaff" || mObj.kind==="safetyStaff");
+      let baseDx = isStaff ? 36 : 44;
+      let baseDy = isStaff ? -42 : -46;
+      if (mObj.kind==="carIn")  { baseDx = 44; baseDy = -58; }
+      if (mObj.kind==="carOut") { baseDx = 44; baseDy = -30; }
+      if (mObj.kind==="control"){ baseDx = 44; baseDy = -46; }
+      if (mObj.kind==="vipGate" || mObj.kind==="gateIn" || mObj.kind==="gateOut"){ baseDx = 44; baseDy = -46; }
+
+      activeLabelDrag.startDx = (typeof activeLabelDrag.startDx==="number") ? activeLabelDrag.startDx : baseDx;
+      activeLabelDrag.startDy = (typeof activeLabelDrag.startDy==="number") ? activeLabelDrag.startDy : baseDy;
+
+      document.body.style.cursor = "grabbing";
+    }, true);
+
+    window.addEventListener("mousemove", (e)=>{
+      if(!activeLabelDrag) return;
+      e.preventDefault();
+      const {id, sc, startX, startY, startDx, startDy} = activeLabelDrag;
+      const dx = startDx + (e.clientX - startX)/sc;
+      const dy = startDy + (e.clientY - startY)/sc;
+      setLabelManualOffset(id, dx, dy);
+    }, true);
+
+    window.addEventListener("mouseup", (e)=>{
+      if(!activeLabelDrag) return;
+      e.preventDefault();
+      const {id} = activeLabelDrag;
+      activeLabelDrag = null;
+      document.body.style.cursor = "";
+      pushHistory();
+      setTextarea();
+      autosave();
+      toast("라벨 위치 저장");
+    }, true);
+
+
+    mapEl.addEventListener("click", (e)=>{
+      const xBtn = e.target.closest?.(".mX");
+      if (xBtn){
+        e.stopPropagation();
+        const label = xBtn.closest(".mLabel");
+        const id = label?.dataset?.mid;
+        if(!id) return;
+        const mObj = DATA.markers.find(mm=>mm.id===id);
+        if(!mObj) return;
+        pushHistory();
+        mObj.labelVisible = false;
+        const ov = overlays.markers.get(id);
+        try{ ov?.label?.setMap(null); }catch(err){}
+        setTextarea();
+        renderSavedList(false);
+        toast("라벨 삭제");
+        return;
+      }
+
+      const txt = e.target.closest?.(".mText");
+      if (txt){
+        e.stopPropagation();
+        // 포커스는 브라우저가 처리. (contenteditable)
+        txt.dataset.prev = (txt.innerText || "").trim();
+        return;
+      }
+    }, true);
+
+    mapEl.addEventListener("keydown", (e)=>{
+      const txt = e.target.closest?.(".mText");
+      if(!txt) return;
+      if(e.key === "Enter"){
+        e.preventDefault();
+        txt.blur();
+      }
+      e.stopPropagation();
+    }, true);
+
+    mapEl.addEventListener("blur", (e)=>{
+      const txt = e.target.closest?.(".mText");
+      if(!txt) return;
+      const label = txt.closest(".mLabel");
+      const id = label?.dataset?.mid;
+      if(!id) return;
+      const next = (txt.innerText || "").trim();
+      const prev = (txt.dataset.prev || "").trim();
+      if(next === prev) return;
+
+      const mObj = DATA.markers.find(mm=>mm.id===id);
+      if(!mObj) return;
+      pushHistory();
+      mObj.labelText = next;
+      // 라벨 리렌더
+      const ov = overlays.markers.get(id);
+      try{
+        if(ov?.label){
+          ov.label.setIcon({ content: labelContent(mObj, ov.stackDy || 0), anchor:new naver.maps.Point(0,0) });
+        }
+      }catch(err){}
+      setTextarea();
+      renderSavedList(false);
+      toast("라벨 수정");
+    }, true);
+
+    // 줌 변화에 맞춰 표식/데코를 함께 스케일(가독성 개선)
+    currentScale = scaleByZoom();
+
+    let _zoomTimer = null;
+    function scheduleAfterZoom(){
+      if(_zoomTimer) clearTimeout(_zoomTimer);
+      _zoomTimer = setTimeout(()=>{
+        try{ recomputeLabelStacks(); }catch(e){}
+        // re-decorate lines (arrows/cones/tape/block) AFTER zoom settles (성능/블랙스크린 방지)
+        try{
+          for (const l of DATA.lines){ decorateLine(l); }
+        }catch(e){}
+      }, 120);
+    }
+
+    naver.maps.Event.addListener(map, "zoom_changed", ()=>{
+      const zoom = map.getZoom();
+      currentScale = Math.max(0.55, Math.min(1.35, zoom / 16));
+
+      // update markers (icon + label)
+      for (const m of DATA.markers){
+        const ov = overlays.markers.get(m.id);
+        if(!ov) continue;
+        ov.marker.setIcon({ content:`<div style="transform:scale(${currentScale}) rotate(${m.rotation||0}deg); transform-origin:0 0;">${markerIcon(m.kind,m.name)}</div>`, anchor:new naver.maps.Point(0,0) });
+        if (ov.label){
+          ov.label.setIcon({ content: labelContent(m, ov.stackDy || 0), anchor:new naver.maps.Point(0,0) });
+        }
+      }
+      scheduleAfterZoom();
+    });
+
+    // 이동/드래그 후에도 라벨 겹침 재계산
+    naver.maps.Event.addListener(map, "idle", ()=>{ try{ recomputeLabelStacks(); }catch(e){} });
+
+    loadAutosave();
+    migrateData();
+    refreshSubtypeOptions();
+    refreshVersionList(false);
+    redrawAll();
+
+    naver.maps.Event.addListener(map, "click", (e)=>{
+      if (ioWizard.active){
+        pushHistory();
+        if (ioWizard.step===0){
+          createGate("gateIn", `${ioWizard.parkingName} IN`, e.latlng);
+          ioWizard.step=1;
+          toast("OUT 위치 클릭");
+        } else {
+          createGate("gateOut", `${ioWizard.parkingName} OUT`, e.latlng);
+          ioWizard.active=false; ioWizard.step=0; ioWizard.parkingName=null;
+          setTextarea(); renderSavedList();
+          toast("IN/OUT 완료");
+        }
+        return;
+      }
+
+      if (editing && addPointMode && (selected?.tab==="areas" || selected?.tab==="lines")){
+        insertPointAtClick(e.latlng);
+        return;
+      }
+
+      if (mode==="marker"){
+        const ll=snapLatLng(e.latlng);
+        pendingStart({ mode:"marker", subtype, points:[{lat:ll.lat(), lng:ll.lng()}], suggest: (
+          subtype==="parkingStaff"?"주차관리원1":
+          subtype==="safetyStaff"?"안전요원1":
+          subtype==="carIn"?"차량 진입(IN)":
+          subtype==="carOut"?"차량 출차(OUT)":
+          subtype==="control"?"통제(검문)":
+          subtype==="vipGate"?"관계자 입구":
+          subtype==="gateIn"?"주차장 IN":subtype==="gateOut"?"주차장 OUT":subtype==="stage"?"무대":"무대"
+        )});
+        return;
+      }
+
+      const ll=snapLatLng(e.latlng);
+      tempPoints.push({lat:ll.lat(), lng:ll.lng()});
+      redrawTemp();
+    });
+
+    window.addEventListener("keydown", (ev)=>{
+      if ((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==="z"){ ev.preventDefault(); doUndo(); return; }
+      if ((ev.ctrlKey||ev.metaKey) && (ev.key.toLowerCase()==="y" || (ev.shiftKey && ev.key.toLowerCase()==="z"))){ ev.preventDefault(); doRedo(); return; }
+
+      const tag=(document.activeElement?.tagName||"").toLowerCase();
+
+      if (ev.key==="Backspace" && tag!=="input" && tag!=="textarea"){
+        ev.preventDefault();
+        if (tempPoints.length){ tempPoints.pop(); redrawTemp(); }
+      }
+      if (ev.key==="Enter"){
+        if (tag==="input" && document.activeElement.id==="pendingName"){
+          ev.preventDefault();
+          if(!document.getElementById("pendingSave").disabled) commitPending();
+          return;
+        }
+        if (tag==="input" || tag==="textarea") return;
+        ev.preventDefault();
+
+        if (mode==="area" && tempPoints.length>=3){
+          pendingStart({ mode:"area", subtype, points:[...tempPoints], suggest:(subtype==="parking"?"주차장1":subtype==="event"?"행사장":"관계자주차장") });
+          clearTemp(); return;
+        }
+        if (mode==="line" && tempPoints.length>=2){
+          pendingStart({ mode:"line", subtype, points:[...tempPoints], suggest:(subtype==="cone"?"라바콘(차단)":subtype==="oneway"?"일방통행":"동선") });
+          clearTemp(); return;
+        }
+      }
+      if (ev.key==="Escape"){ pendingClear(); }
+    });
+
+    // UI
+    document.getElementById("modeArea").onclick=()=>setMode("area");
+    document.getElementById("modeLine").onclick=()=>setMode("line");
+    document.getElementById("modeMarker").onclick=()=>setMode("marker");
+    document.getElementById("subtype").onchange=(e)=>{ subtype=e.target.value; updateStyleColorUI(); };
+    document.getElementById("styleColor").oninput=(e)=>{ applyStyleColor(e.target.value); };
+    document.getElementById("styleColorReset").onclick=()=>{ resetStyleColor(); };
+    document.getElementById("styleColorApplyAll").onclick=()=>{ applyStyleColorAll(document.getElementById("styleColor").value); };
+
+    document.getElementById("clearTemp").onclick=()=>{ clearTemp(); pendingClear(); };
+
+    document.getElementById("pendingSave").onclick=()=>commitPending();
+    document.getElementById("pendingCancel").onclick=()=>pendingClear("취소됨");
+
+    document.getElementById("tabAreas").onclick=()=>setTab("areas");
+    document.getElementById("tabLines").onclick=()=>setTab("lines");
+    document.getElementById("tabMarkers").onclick=()=>setTab("markers");
+
+    document.getElementById("editToggle").onclick=()=>{
+      if(!selected) return;
+      if(editing){ stopEditing(); toast("편집 종료"); }
+      else { startEditing(); }
+    };
+    document.getElementById("addPoint").onclick=()=>toggleAddPoint();
+    document.getElementById("reverseLine").onclick=()=>reverseSelectedLine();
+    
+    document.getElementById("fitSel").onclick=()=>fitSelected();
+    document.getElementById("applyDecor").onclick=()=>applyDecorSelected();
+
+    document.getElementById("undo").onclick=()=>doUndo();
+    document.getElementById("redo").onclick=()=>doRedo();
+
+    document.getElementById("parkingPick").innerHTML=buildParkingOptionsHtml();
+    document.getElementById("ioWizard").onclick=()=>toggleIOWizard();
+
+    document.getElementById("copy").onclick=async()=>{
+      try{ await navigator.clipboard.writeText(document.getElementById("out").value); toast("JSON 복사"); }
+      catch(e){ alert("복사 실패"); }
+    };
+
+    document.getElementById("load").onclick=()=>{
+      try{
+        const obj=JSON.parse(document.getElementById("out").value);
+        pushHistory();
+        loadAnyJson(obj);
+        redrawAll();
+        fitAll();
+        toast("불러오기");
+      }catch(e){ alert("불러오기 실패: "+e.message); }
+    };
+    document.getElementById("fitAll").onclick=()=>fitAll();
+
+    document.getElementById("search").oninput=()=>renderSavedList(false);
+
+    document.getElementById("projTitle").oninput=(e)=>{
+      DATA.meta = DATA.meta || {};
+      DATA.meta.title = e.target.value.trim() || "행사 주차·교통 운영도";
+      setTextarea();
+      autosave();
+    };
+
+    
+  // 주소 검색 이동
+  document.getElementById("goAddr")?.addEventListener("click", ()=> goAddress(document.getElementById("addr").value));
+  document.getElementById("addr")?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); goAddress(e.target.value); }});
+document.getElementById("printToggle").onclick=()=>togglePrintMode();
+    // print mode actions (print button is shown only in printmode)
+    document.getElementById("printNow").onclick=()=>window.print();
+    document.getElementById("exitPrint").onclick=()=>togglePrintMode(false);
+
+    document.addEventListener("keydown",(e)=>{ if(e.key==="Escape" && document.body.classList.contains("printmode")) togglePrintMode(false); });
+
+    document.getElementById("newProject").onclick=()=>newProject();
+    document.getElementById("saveVersion").onclick=()=>saveVersion();
+    document.getElementById("loadVersion").onclick=()=>loadVersion();
+
+    document.getElementById("showAreas").onchange=(e)=>{ layer.areas=e.target.checked; for(const [id,ov] of overlays.areas) setOverlayVisible(ov, layer.areas); };
+    document.getElementById("showLines").onchange=(e)=>{ layer.lines=e.target.checked; for(const [id,ov] of overlays.lines) setOverlayVisible(ov, layer.lines); };
+    document.getElementById("showMarkers").onchange=(e)=>{ 
+      layer.markers=e.target.checked; 
+      for(const [id,ov] of overlays.markers){
+        if (ov.marker) ov.marker.setMap(layer.markers ? map : null);
+        if (ov.label){
+          const show = layer.markers && layer.markerLabels && (m.labelVisible!==false);
+          ov.label.setMap(show ? map : null);
+        }
+      }
+    };
+    document.getElementById("showMarkerLabels").onchange=(e)=>{
+      layer.markerLabels = e.target.checked;
+      for (const m of DATA.markers){
+        const ov = overlays.markers.get(m.id);
+        if (ov?.label){
+          const show = layer.markers && layer.markerLabels && (m.labelVisible!==false);
+          ov.label.setMap(show ? map : null);
+        }
+      }
+    };
+    document.getElementById("snapOn").onchange=(e)=>{ layer.snap=e.target.checked; };
+
+    document.getElementById("areaOpacity").oninput=(e)=>{
+      layer.areaOpacity=parseInt(e.target.value,10)/100;
+      DATA.areas.forEach(a=>{
+        const ov=overlays.areas.get(a.id);
+        if(!ov) return;
+        const st=areaStyle(a.kind);
+        ov.poly.setOptions({ fillOpacity: st.fillOpacity });
+      });
+    };
+
+    document.getElementById("lineWidth").oninput=(e)=>{
+      layer.lineWidth=parseInt(e.target.value,10);
+      DATA.lines.forEach(l=>{
+        const ov=overlays.lines.get(l.id);
+        if(!ov) return;
+        const st=lineStyle(l.kind);
+        ov.line.setOptions({ strokeWeight: st.w, strokeStyle: st.style });
+      });
+    };
+  }
+
+  window.addEventListener("load", ()=>{
+    let tries=0;
+    const t=setInterval(()=>{
+      tries++;
+      if (window.naver && naver.maps && naver.maps.Map){
+        clearInterval(t);
+        initMap();
+      }
+      if (tries>170){
+        clearInterval(t);
+        alert("지도 로드 실패. NCP Web 서비스 URL(localhost/127.0.0.1) 등록 여부와 콘솔 에러를 확인하세요.");
+      }
+    }, 80);
+  });
+
+</script>
+</body>
+</html>
