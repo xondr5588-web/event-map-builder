@@ -1,0 +1,292 @@
+import { kindInfo } from "./catalog.js";
+import { iconPath } from "./icons.js";
+import { center, length, meters, samples, distance } from "./geometry.js";
+export const escapeHTML = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}) => {
+  const node = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+const attr = (n, k, v) => {
+  const s = String(v);
+  if (n.getAttribute(k) !== s) n.setAttribute(k, s);
+};
+const linePath = (pts) =>
+  pts
+    .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
+    .join(" ");
+export class Renderer {
+  constructor(svg, adapter) {
+    this.svg = svg;
+    this.map = adapter;
+    this.entries = new Map();
+    svg.innerHTML =
+      '<defs><pattern id="safety-tape" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="16" height="16" fill="#f7d449"/><rect width="7" height="16" fill="#182533"/></pattern><pattern id="barrier" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="20" height="20" fill="white"/><rect width="10" height="20" fill="#dd4954"/></pattern></defs>';
+    this.shapes = el("g", { class: "objects" });
+    this.handles = el("g", { class: "handles" });
+    this.draft = el("g", { class: "draft", "pointer-events": "none" });
+    svg.append(this.shapes, this.draft, this.handles);
+  }
+  create(o) {
+    const group = el("g", {
+      "data-object": o.id,
+      class: `map-object ${o.type}`,
+      role: "button",
+      tabindex: "-1",
+    });
+    const shape = el(o.type === "marker" ? "g" : "path", {
+        class: "object-shape",
+      }),
+      hit = el(o.type === "marker" ? "circle" : "path", {
+        class: "object-hit",
+        fill: "none",
+        stroke: "transparent",
+        "stroke-width": 24,
+      });
+    if (o.type === "marker") {
+      hit.setAttribute("r", 24);
+      hit.setAttribute("fill", "transparent");
+      hit.removeAttribute("stroke");
+    }
+    const decorations = el("g", { "pointer-events": "none" }),
+      label = el("g", { "data-handle": "label", class: "object-label" }),
+      leader = el("path", {
+        class: "label-leader",
+        stroke: "#697b88",
+        "stroke-width": 1,
+        "stroke-dasharray": "3 3",
+        fill: "none",
+        "pointer-events": "none",
+      });
+    label.append(
+      el("rect", { rx: 6, height: 26, y: -13 }),
+      el("text", { "text-anchor": "middle", "dominant-baseline": "central" }),
+    );
+    group.append(shape, decorations, hit, leader, label);
+    this.shapes.append(group);
+    const entry = {
+      group,
+      shape,
+      hit,
+      decorations,
+      label,
+      leader,
+      signature: "",
+      decoKey: "",
+    };
+    this.entries.set(o.id, entry);
+    return entry;
+  }
+  draw(
+    project,
+    selection = new Set(),
+    editing = false,
+    draft = null,
+    vertex = -1,
+  ) {
+    const { width, height } = this.map.size;
+    attr(this.svg, "viewBox", `0 0 ${width} ${height}`);
+    const keep = new Set(),
+      buckets = new Map(),
+      mapKey = `${this.map.view.center.lat}:${this.map.view.center.lng}:${this.map.view.zoom}:${width}:${height}`;
+    for (const o of project.objects) {
+      keep.add(o.id);
+      const e = this.entries.get(o.id) || this.create(o),
+        selected = selection.has(o.id),
+        visible = o.visible && project.settings.layers[o.type];
+      attr(e.group, "display", visible ? "inline" : "none");
+      if (!visible) continue;
+      attr(
+        e.group,
+        "class",
+        `map-object ${o.type}${selected ? " selected" : ""}${o.locked ? " locked" : ""}`,
+      );
+      attr(e.group, "aria-label", `${o.name} (${kindInfo(o)[0]})`);
+      const info = kindInfo(o),
+        pts = (o.path || [o.position]).map((p) => this.map.project(p));
+      if (o.type === "marker") {
+        attr(
+          e.shape,
+          "transform",
+          `translate(${pts[0].x},${pts[0].y}) rotate(${o.rotation})`,
+        );
+        attr(e.hit, "cx", pts[0].x);
+        attr(e.hit, "cy", pts[0].y);
+        const signature = `${info[2]}:${o.style.color}`;
+        if (e.signature !== signature) {
+          e.shape.innerHTML = `<circle class="marker-halo" r="23" fill="white" stroke="${o.style.color}" stroke-width="2"/><circle r="18" fill="${o.style.color}"/><g transform="translate(-12,-12)" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPath(info[2])}"/></g>`;
+          e.signature = signature;
+        }
+      } else {
+        const d = linePath(pts) + (o.type === "area" ? " Z" : "");
+        attr(e.shape, "d", d);
+        attr(e.hit, "d", d);
+        attr(e.shape, "fill", o.type === "area" ? o.style.color : "none");
+        attr(e.shape, "fill-opacity", o.style.opacity);
+        attr(
+          e.shape,
+          "stroke-opacity",
+          o.type === "line" ? o.style.opacity : 1,
+        );
+        attr(e.decorations, "opacity", o.style.opacity);
+        attr(
+          e.shape,
+          "stroke",
+          o.kind === "tape"
+            ? "url(#safety-tape)"
+            : o.kind === "block"
+              ? "url(#barrier)"
+              : o.style.color,
+        );
+        attr(e.shape, "stroke-width", o.style.width + (selected ? 2 : 0));
+        attr(e.shape, "stroke-linejoin", "round");
+        attr(e.shape, "stroke-linecap", "round");
+        attr(
+          e.shape,
+          "stroke-dasharray",
+          o.kind === "oneway" ? "12 7" : o.kind === "measure" ? "5 5" : "none",
+        );
+        if (o.type === "area") {
+          attr(e.hit, "fill", "transparent");
+          attr(e.hit, "stroke", "transparent");
+        }
+        const decoKey = mapKey + JSON.stringify([o.path, o.style, o.kind]);
+        if (o.type === "line" && e.decoKey !== decoKey) {
+          const mpp = distance(
+            this.map.unproject({ x: 0, y: 0 }),
+            this.map.unproject({ x: 1, y: 0 }),
+          );
+          const spacing = Math.max(
+            o.style.spacing,
+            mpp * (o.kind === "cone" ? 18 : 48),
+          );
+          const ss = [
+            "cone",
+            "oneway",
+            "vehicle",
+            "pedestrian",
+            "block",
+          ].includes(o.kind)
+            ? samples(o.path, spacing, 100)
+            : [];
+          const end = o.path.at(-1),
+            previous = o.path.at(-2);
+          if (
+            ["oneway", "vehicle", "pedestrian"].includes(o.kind) &&
+            distance(end, previous) > 0.05
+          )
+            ss.push({ point: end, from: previous, to: end });
+          e.decorations.innerHTML = ss
+            .map((s) => {
+              const p = this.map.project(s.point),
+                a = this.map.project(s.from),
+                b = this.map.project(s.to),
+                angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+              if (o.kind === "cone")
+                return `<g transform="translate(${p.x},${p.y})"><path d="M0-9L7 8H-7Z" fill="${o.style.color}" stroke="white" stroke-width="1.5"/><path d="M-3 0h6M-8 9H8" stroke="white" stroke-width="2"/></g>`;
+              if (o.kind === "block")
+                return `<g transform="translate(${p.x},${p.y})"><circle r="9" fill="${o.style.color}" stroke="white" stroke-width="2"/><path d="M-5 0H5" stroke="white" stroke-width="3"/></g>`;
+              return `<path transform="translate(${p.x},${p.y}) rotate(${angle})" d="M-10-6L0 0-10 6" fill="none" stroke="white" stroke-width="7" stroke-linejoin="round"/><path transform="translate(${p.x},${p.y}) rotate(${angle})" d="M-10-6L0 0-10 6" fill="none" stroke="${o.style.color}" stroke-width="3" stroke-linejoin="round"/>`;
+            })
+            .join("");
+          e.decoKey = decoKey;
+        }
+      }
+      const anchor = this.map.project(
+        o.label.position || o.position || center(o.path),
+      );
+      let x = anchor.x + o.label.dx,
+        y = anchor.y + o.label.dy;
+      if (!o.label.manual && !o.label.position) {
+        const key = `${Math.round(x / 130)}:${Math.round(y / 32)}`,
+          count = buckets.get(key) || 0;
+        buckets.set(key, count + 1);
+        y += count * 30;
+      }
+      const show =
+        project.settings.labels &&
+        o.label.visible &&
+        (selected ||
+          (x > -250 && y > -150 && x < width + 250 && y < height + 150));
+      attr(e.label, "display", show ? "inline" : "none");
+      if (show) {
+        const labelText =
+          o.kind === "measure"
+            ? `${o.label.text} · ${meters(length(o.path))}`
+            : o.label.text;
+        const shown = labelText.slice(0, 80);
+        e.label.lastChild.textContent = shown;
+        const w = Math.max(
+          44,
+          Array.from(shown).reduce(
+            (s, c) => s + (/[\u1100-\uffff]/.test(c) ? 12 : 7),
+            0,
+          ) + 18,
+        );
+        attr(e.label.firstChild, "width", w);
+        attr(e.label.firstChild, "x", -w / 2);
+        attr(e.label, "transform", `translate(${x},${y})`);
+      }
+      const objectAnchor = this.map.project(o.position || center(o.path));
+      attr(
+        e.leader,
+        "d",
+        show && Math.hypot(x - objectAnchor.x, y - objectAnchor.y) > 45
+          ? `M${objectAnchor.x},${objectAnchor.y}L${x},${y}`
+          : "",
+      );
+    }
+    for (const [id, e] of this.entries)
+      if (!keep.has(id)) {
+        e.group.remove();
+        this.entries.delete(id);
+      }
+    // Only reorder after object ordering actually changes.
+    const order = project.objects.map((o) => o.id).join("|");
+    if (this.order !== order) {
+      for (const o of project.objects)
+        this.shapes.append(this.entries.get(o.id).group);
+      this.order = order;
+    }
+    const edit =
+      editing && selection.size === 1
+        ? project.objects.find(
+            (o) =>
+              selection.has(o.id) &&
+              !o.locked &&
+              o.visible &&
+              project.settings.layers[o.type],
+          )
+        : null;
+    let handles = "";
+    if (edit?.path) {
+      edit.path.forEach((p, i) => {
+        const q = this.map.project(p);
+        handles += `<g data-object="${edit.id}" data-handle="vertex" data-index="${i}" transform="translate(${q.x},${q.y})" class="vertex"><circle r="22" fill="transparent"/><circle r="${i === vertex ? 9 : 7}" fill="${i === vertex ? "#ed8635" : "white"}" stroke="#16615a" stroke-width="3"/><text y="-13" text-anchor="middle">${i + 1}</text></g>`;
+        if (i < edit.path.length - 1 || edit.type === "area") {
+          const r = this.map.project(edit.path[(i + 1) % edit.path.length]);
+          handles += `<g data-object="${edit.id}" data-handle="midpoint" data-index="${i}" transform="translate(${(q.x + r.x) / 2},${(q.y + r.y) / 2})" class="midpoint"><circle r="20" fill="transparent"/><circle r="8" fill="#16615a" stroke="white" stroke-width="2"/><path d="M-3 0h6M0-3v6" stroke="white" stroke-width="1.5"/></g>`;
+        }
+      });
+    }
+    this.handles.innerHTML = handles;
+    if (draft?.points.length) {
+      const pts = draft.points.map((p) => this.map.project(p)),
+        all = draft.hover ? [...pts, this.map.project(draft.hover)] : pts;
+      this.draft.innerHTML = `<path d="${linePath(all)}${draft.type === "area" && pts.length > 2 ? " Z" : ""}" fill="${draft.type === "area" ? "#209477" : "none"}" fill-opacity=".13" stroke="#167560" stroke-width="3" stroke-dasharray="8 5"/>${pts.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${i ? "white" : "#167560"}" stroke="#167560" stroke-width="2"/>`).join("")}`;
+    } else this.draft.replaceChildren();
+  }
+  destroy() {
+    cancelAnimationFrame(this.frame);
+    this.entries.clear();
+    this.svg.replaceChildren();
+  }
+}
