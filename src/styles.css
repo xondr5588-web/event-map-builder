@@ -533,8 +533,8 @@ a {
   pointer-events: auto;
 }
 #map-notice button {
-  padding: 0;
-  min-height: 24px;
+  padding: 6px 10px;
+  min-height: 44px;
   font-size: 11px;
   text-decoration: underline;
 }
@@ -1191,6 +1191,10 @@ kbd {
     right: 72px;
     top: 148px;
     max-height: calc(100% - 210px);
+  }
+  #stage:has(#map-notice:not([hidden])) #inspector {
+    top: 276px;
+    max-height: calc(100% - 300px);
   }
   .project-heading {
     padding-left: 18px;

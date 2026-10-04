@@ -3,6 +3,7 @@ import { clamp, world, unworld, validCoord } from "./geometry.js";
 export const MAP_CLIENT_ID =
   import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "b4anccamja";
 export const PLACE_URL = import.meta.env?.VITE_PLACE_SEARCH_URL || "";
+let reloadSDK = false;
 export class MapAdapter {
   constructor(element, view, onChange, onStatus) {
     this.el = element;
@@ -17,13 +18,29 @@ export class MapAdapter {
   get size() {
     return { width: this.el.clientWidth, height: this.el.clientHeight };
   }
+  releaseMap() {
+    const map = this.map;
+    this.map = null;
+    const listeners = this.listeners;
+    this.listeners = [];
+    // An authentication rejection can invalidate SDK internals before its callback.
+    // Cleanup must still allow the editor to switch to its local coordinate map.
+    for (const listener of listeners) {
+      try {
+        window.naver?.maps?.Event?.removeListener(listener);
+      } catch {
+        // The rejected SDK no longer owns a usable event registry.
+      }
+    }
+    try {
+      map?.destroy?.();
+    } catch {
+      // Drop our references and DOM even if SDK teardown is unavailable.
+    }
+  }
   fail(message) {
     this.online = false;
-    for (const listener of this.listeners)
-      window.naver?.maps?.Event.removeListener(listener);
-    this.listeners = [];
-    this.map?.destroy?.();
-    this.map = null;
+    this.releaseMap();
     this.el.replaceChildren();
     this.onStatus("error", message);
     this.onChange();
@@ -75,6 +92,7 @@ export class MapAdapter {
   async loadSDK() {
     this.authError = null;
     window.navermap_authFailure = () => {
+      reloadSDK = true;
       this.authError = new Error(
         "네이버 지도 인증 실패 · 허용 도메인과 API 키를 확인하세요.",
       );
@@ -121,8 +139,10 @@ export class MapAdapter {
         document.head.append(script);
       });
     // Load sequentially: dynamically injected submodules can otherwise rely on document.write.
-    if (!window.naver?.maps?.Map)
+    if (reloadSDK || !window.naver?.maps?.Map) {
+      reloadSDK = false;
       await load("maps.js", () => !!window.naver?.maps?.Map);
+    }
     if (this.authError) throw this.authError;
     if (!window.naver?.maps?.Service)
       await load("maps-geocoder.js", () => !!window.naver?.maps?.Service);
@@ -312,8 +332,6 @@ export class MapAdapter {
     this.rejectSDK?.(new Error("지도 연결을 다시 시작합니다."));
     this.online = false;
     this.observer.disconnect();
-    for (const l of this.listeners) window.naver.maps.Event.removeListener(l);
-    this.listeners = [];
-    this.map?.destroy?.();
+    this.releaseMap();
   }
 }

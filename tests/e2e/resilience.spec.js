@@ -67,6 +67,79 @@ async function createCenterMarker(page) {
   await page.locator("[data-action=finish]").click();
 }
 
+test.describe("SDK connection", () => {
+  test.use({ serviceWorkers: "block" });
+  test("late SDK authentication failure preserves editing and reconnect reloads SDK", async ({
+    page,
+  }) => {
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let loads = 0;
+    await page.route(
+      "https://oapi.map.naver.com/openapi/v3/maps.js?*",
+      (route) => {
+        const reject = ++loads === 1;
+        return route.fulfill({
+          contentType: "application/javascript",
+          body: `
+      (() => {
+        let invalid = false;
+        class LatLng {
+          constructor(lat, lng) { this.a = lat; this.b = lng; }
+          lat() { return this.a; } lng() { return this.b; }
+        }
+        window.naver = { maps: {
+          LatLng, Size: class {},
+          MapTypeId: { NORMAL: 'normal', HYBRID: 'hybrid' },
+          Map: class {
+            constructor(el, options) {
+              this.center = options.center; this.zoom = options.zoom;
+              this.type = options.mapTypeId;
+              if (${reject}) setTimeout(() => {
+                invalid = true; window.navermap_authFailure();
+              }, 30);
+            }
+            getCenter() { return this.center; }
+            setCenter(center) { this.center = center; }
+            getZoom() { return this.zoom; }
+            setZoom(zoom) { this.zoom = zoom; }
+            getMapTypeId() { return this.type; }
+            setMapTypeId(type) { this.type = type; }
+            getProjection() { return null; }
+            setSize() {}
+            destroy() { if (invalid) throw new TypeError('SDK invalidated'); }
+          },
+          Event: {
+            addListener() { return {}; },
+            removeListener() { if (invalid) throw new TypeError('SDK invalidated'); }
+          },
+          Service: { Status: { OK: 'OK' }, geocode(query, done) {
+            done('OK', { v2: { addresses: [{ roadAddress: '김해시 김해대로 2401',
+              jibunAddress: '김해시청', x: '128.889', y: '35.228' }] } });
+          } }
+        } };
+      })();`,
+        });
+      },
+    );
+    await page.goto("/");
+    await expect(page.locator("#map-notice")).toContainText("인증 실패");
+    await expect(page.locator("#map-provider")).toHaveText(
+      "지도 연결 확인 필요",
+    );
+    await createCenterMarker(page);
+    await expect(page.locator("#save-status")).toContainText("완료");
+    await page.locator("#map-notice [data-action=retry-map]").click();
+    await expect(page.locator("#map-provider")).toHaveText("NAVER Maps");
+    expect(loads).toBe(2);
+    await expect(page.locator(".map-object")).toHaveCount(1);
+    await page.locator("#address-search").fill("김해시 김해대로 2401");
+    await page.locator("#search-form button").click();
+    await expect(page.locator("#search-results")).toContainText("김해시청");
+    expect(errors).toEqual([]);
+  });
+});
+
 test("old localStorage, original backup, versions and bad file recovery", async ({
   page,
 }) => {

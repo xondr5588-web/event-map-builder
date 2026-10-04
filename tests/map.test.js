@@ -1,6 +1,58 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { MapAdapter } from "../src/map.js";
+test("rejected SDK cleanup cannot prevent offline editing or retry", () => {
+  const previous = globalThis.window;
+  let removed = 0,
+    destroyed = 0,
+    cleared = 0,
+    changed = 0;
+  const statuses = [];
+  globalThis.window = {
+    naver: {
+      maps: {
+        Event: {
+          removeListener() {
+            removed++;
+            throw new TypeError("SDK invalidated");
+          },
+        },
+      },
+    },
+  };
+  try {
+    const adapter = Object.create(MapAdapter.prototype);
+    adapter.online = true;
+    adapter.listeners = [1, 2, 3];
+    adapter.map = {
+      destroy() {
+        destroyed++;
+        throw new TypeError("SDK invalidated");
+      },
+    };
+    adapter.el = {
+      replaceChildren() {
+        cleared++;
+      },
+    };
+    adapter.observer = { disconnect() {} };
+    adapter.onStatus = (...args) => statuses.push(args);
+    adapter.onChange = () => changed++;
+    assert.doesNotThrow(() => adapter.fail("인증 실패"));
+    assert.equal(adapter.online, false);
+    assert.equal(adapter.map, null);
+    assert.deepEqual(adapter.listeners, []);
+    assert.deepEqual(statuses, [["error", "인증 실패"]]);
+    assert.equal(removed, 3);
+    assert.equal(destroyed, 1);
+    assert.equal(cleared, 1);
+    assert.equal(changed, 1);
+    assert.doesNotThrow(() => adapter.destroy());
+    assert.equal(destroyed, 1);
+  } finally {
+    globalThis.window = previous;
+  }
+});
 test("SDK overlay-pane offsets are converted relative to the current map center", () => {
   const previous = globalThis.window;
   class Point {
