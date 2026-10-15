@@ -1,5 +1,18 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+if (process.argv.includes("--protected")) {
+  await writeFile("dist/sw.js", `/* Security transition: never serve authenticated app files from an offline cache. */
+const PREFIX='field-shell-'+encodeURIComponent(new URL(self.registration.scope).pathname)+'-';
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate', event => event.waitUntil((async () => {
+  for (const key of await caches.keys()) if (key.startsWith(PREFIX)) await caches.delete(key);
+  await self.clients.claim();
+})()));
+// No fetch handler: every navigation goes through the hosting access boundary.
+`);
+  console.log("Protected deployment: network-only shell; project storage preserved");
+  process.exit(0);
+}
 async function walk(dir) {
   const items = await readdir(dir, { withFileTypes: true });
   return (

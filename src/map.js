@@ -1,7 +1,7 @@
 import { clone } from "./model.js";
 import { clamp, world, unworld, validCoord } from "./geometry.js";
 export const MAP_CLIENT_ID =
-  import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "b4anccamja";
+  import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "";
 export const PLACE_URL = import.meta.env?.VITE_PLACE_SEARCH_URL || "";
 let reloadSDK = false;
 export class MapAdapter {
@@ -48,6 +48,10 @@ export class MapAdapter {
   async start() {
     if (new URLSearchParams(location.search).get("map") === "offline") {
       this.onStatus("offline", "오프라인 도면 · 배경지도 없음");
+      return;
+    }
+    if (!MAP_CLIENT_ID) {
+      this.onStatus("offline", "지도 연결 설정이 없습니다. 비공개 작업 공간을 이용하세요.");
       return;
     }
     if (!navigator.onLine) {

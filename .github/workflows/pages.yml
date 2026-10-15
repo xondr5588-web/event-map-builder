@@ -23,8 +23,7 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          VITE_NAVER_MAP_CLIENT_ID: ${{ vars.NAVER_MAP_CLIENT_ID }}
-          VITE_PLACE_SEARCH_URL: ${{ vars.PLACE_SEARCH_URL }}
+          VITE_NAVER_MAP_CLIENT_ID: test-client
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
@@ -33,9 +32,11 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+      - run: npm run build:pages
+      - run: node scripts/verify-public-build.mjs
       - uses: actions/upload-artifact@v4
         with:
-          name: production-build
+          name: public-recovery-build
           path: dist/
           retention-days: 14
       - uses: actions/upload-pages-artifact@v4

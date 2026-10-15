@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/build-sw.mjs",
+    "build:pages": "vite build --mode public && node scripts/build-sw.mjs --protected",
+    "build:private": "vite build --mode private && node scripts/build-sw.mjs --protected",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.js",
     "test:e2e": "playwright test",
