@@ -13,6 +13,16 @@ async function choose(page, kind) {
   await page.locator('[data-action="center-point"]').click();
   await page.locator('[data-action="finish"]').click();
 }
+async function place(page, kind, x, y) {
+  await panel(page, "tools");
+  await page.locator(`[data-tool="marker:${kind}"]`).last().click();
+  const box = await page.locator("#editor").boundingBox();
+  await page
+    .locator("#editor")
+    .click({ position: { x: box.width * x, y: box.height * y } });
+  await page.locator('[data-action="finish"]').click();
+  await close(page);
+}
 async function props(page) {
   if (mobile(page))
     await page.locator('#command-bar [data-action="properties"]').click();
@@ -170,7 +180,7 @@ test("marker, label and line size follow zoom while touch targets retain minimum
     "8",
   );
 });
-test("field symbols and police emblem render consistently in tools and map", async ({
+test("booth, guard and police symbols render in map, export and saved data", async ({
   page,
 }, info) => {
   await choose(page, "police");
@@ -183,15 +193,16 @@ test("field symbols and police emblem render consistently in tools and map", asy
       .locator('.map-object.marker [data-symbol="police-emblem"] path')
       .count(),
   ).toBeGreaterThan(10);
-  const mapBox = await page.locator("#editor").boundingBox();
-  await panel(page, "tools");
-  await page.locator('[data-tool="marker:shuttle"]').last().click();
-  await page
-    .locator("#editor")
-    .click({ position: { x: mapBox.width * 0.7, y: mapBox.height * 0.35 } });
-  await page.locator('[data-action="finish"]').click();
-  await close(page);
-  await expect(page.locator(".map-object.marker")).toHaveCount(2);
+  await place(page, "shuttle", 0.7, 0.35);
+  await place(page, "booth", 0.3, 0.35);
+  await place(page, "safetyStaff", 0.5, 0.35);
+  await expect(page.locator(".map-object.marker")).toHaveCount(4);
+  await expect(
+    page.locator('.map-object.marker [data-symbol="event-booth"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.map-object.marker [data-symbol="security-guard"]'),
+  ).toBeVisible();
   await expect(
     page.locator(".map-object.marker text").filter({ hasText: "BUS" }),
   ).toHaveCount(1);
@@ -200,6 +211,13 @@ test("field symbols and police emblem render consistently in tools and map", asy
     page.locator('#print-legend [data-symbol="police-emblem"]'),
   ).toHaveCount(1);
   await expect(page.locator("#print-legend")).toContainText("경찰부스");
+  await expect(
+    page.locator('#print-legend [data-symbol="event-booth"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('#print-legend [data-symbol="security-guard"]'),
+  ).toBeVisible();
+  await expect(page.locator("#print-legend")).toContainText("행사부스");
   await page.locator("[data-action=exit-print]").click();
   const pngPending = page.waitForEvent("download");
   await page.locator(".header-actions [data-action=more]").click();
@@ -211,8 +229,19 @@ test("field symbols and police emblem render consistently in tools and map", asy
   for await (const chunk of stream) chunks.push(chunk);
   const buffer = Buffer.concat(chunks);
   expect(buffer.length).toBeGreaterThan(1000);
-  await info.attach("police-and-shuttle-overlay", {
+  await info.attach("field-symbols-overlay", {
     body: buffer,
     contentType: "image/png",
   });
+  await expect(page.locator("#save-status")).toContainText("완료");
+  await page.reload();
+  await expect(
+    page.locator('.map-object.marker [data-symbol="event-booth"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.map-object.marker [data-symbol="security-guard"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator(".object-label text").filter({ hasText: "안전요원 1" }),
+  ).toHaveCount(1);
 });

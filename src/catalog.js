@@ -29,6 +29,7 @@ export const CATALOG = {
     gateIn: ["주차장 IN", "#258aab", "in"],
     gateOut: ["주차장 OUT", "#258aab", "out"],
     stage: ["무대", "#7462b8", "stage"],
+    booth: ["행사부스", "#d67e37", "stage"],
     medical: ["응급의료", "#d64a68", "medical"],
     info: ["안내소", "#3777cc", "info"],
     toilet: ["화장실", "#53788c", "people"],

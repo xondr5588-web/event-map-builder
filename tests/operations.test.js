@@ -70,6 +70,7 @@ test("summary counts people separately from facilities and excludes hidden layer
     ["parkingStaff", 4],
     ["safetyStaff", 3],
     ["police", 2],
+    ["booth", 5],
   ]) {
     const o = newObject("marker", k, [point]);
     o.operations.quantity = q;
@@ -80,6 +81,7 @@ test("summary counts people separately from facilities and excludes hidden layer
   assert.equal(s.staff, 7);
   assert.equal(s.teams, 1);
   assert.equal(s.resources.find((r) => r.kind === "police").count, 2);
+  assert.equal(s.resources.find((r) => r.kind === "booth").count, 5);
   p.objects[0].visible = false;
   assert.equal(operationalSummary(p).staff, 3);
   p.settings.layers.marker = false;
