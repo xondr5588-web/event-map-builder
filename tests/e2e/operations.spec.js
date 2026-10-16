@@ -184,9 +184,6 @@ test("field symbols and police emblem render consistently in tools and map", asy
       .count(),
   ).toBeGreaterThan(10);
   const mapBox = await page.locator("#editor").boundingBox();
-  await page
-    .locator("#editor")
-    .click({ position: { x: mapBox.width * 0.7, y: mapBox.height * 0.35 } });
   await panel(page, "tools");
   await page.locator('[data-tool="marker:shuttle"]').last().click();
   await page
