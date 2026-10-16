@@ -615,7 +615,7 @@ function settings() {
     .querySelector(".stack")
     .insertAdjacentHTML(
       "afterbegin",
-      `<div class="scale-settings"><b>지도 축척과 요소 크기</b><label class="check-label"><input type="checkbox" data-setting="scaleWithMap" ${project.settings.scaleWithMap ? "checked" : ""}/>지도 축척에 따라 요소 크기 변경</label><label>전체 요소 크기 (%)<input type="number" data-view-setting="symbolSize" min="25" max="300" value="${Math.round(project.settings.symbolSize * 100)}"/></label><button data-action="reference-zoom">현재 지도 확대 수준을 기준으로</button><p class="small muted">기준 확대 ${project.settings.referenceZoom} · 마커·라벨·선 굵기·동선 장식에 적용합니다. 선택용 터치 영역은 최소 크기를 유지합니다.</p></div>`,
+      `<div class="scale-settings"><b>지도 축척과 요소 크기</b><label class="check-label"><input type="checkbox" data-setting="autoSize" ${project.settings.autoSize ? "checked" : ""}/>마커·라벨 자동 크기 조절 (권장)</label><p class="small muted">확대해도 마커와 글자가 지도를 가리지 않도록 화면에 맞춰 크기를 제한합니다. 터치 선택 영역은 작아지지 않습니다.</p><label>전체 요소 크기 (%)<input type="number" data-view-setting="symbolSize" min="25" max="300" value="${Math.round(project.settings.symbolSize * 100)}"/></label><details><summary>고급 축척 설정</summary><label class="check-label"><input type="checkbox" data-setting="scaleWithMap" ${project.settings.scaleWithMap ? "checked" : ""}/>지도 확대·축소에 따라 크기 조절</label><button data-action="reference-zoom">현재 지도 확대 수준을 기준으로</button><p class="small muted">기준 확대 ${project.settings.referenceZoom} · 자동 크기를 끄면 기존 지도 비례 크기를 사용합니다. 구역의 실제 좌표와 동선 간격은 유지됩니다.</p></details></div>`,
     );
 }
 function help() {

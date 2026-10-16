@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { newProject, newObject } from "../../src/model.js";
 const mobile = (page) =>
   page.viewportSize().width <= 760 ||
   (page.viewportSize().width <= 1000 && page.viewportSize().height <= 520);
@@ -106,27 +107,62 @@ test("operational assignments, plan, CSV and report survive reload", async ({
 });
 test("marker, label and line size follow zoom while touch targets retain minimum size", async ({
   page,
-}) => {
+}, info) => {
   await choose(page, "safetyStaff");
   await close(page);
   const shape = page.locator(".map-object.marker .object-shape");
   const before = await shape.boundingBox();
   await page.locator('[data-action="zoom-in"]').click();
-  await expect(page.locator(".map-object.marker")).toHaveAttribute(
-    "data-render-scale",
-    "2",
-  );
+  await expect
+    .poll(async () => (await shape.boundingBox()).width)
+    .toBeGreaterThan(before.width);
   const after = await shape.boundingBox();
-  expect(after.width / before.width).toBeCloseTo(2, 1);
-  await expect(
-    page.locator(".map-object.marker .object-label"),
-  ).toHaveAttribute("transform", /scale\(2\)/);
-  await page.locator('[data-action="zoom-out"]').click();
-  await page.locator('[data-action="zoom-out"]').click();
-  await expect(page.locator(".map-object.marker")).toHaveAttribute(
-    "data-render-scale",
-    "0.5",
+  expect(after.width).toBeGreaterThan(before.width);
+  expect(after.width / before.width).toBeLessThan(1.3);
+  expect(after.width).toBeLessThanOrEqual(49);
+  const label = page.locator(
+    ".map-object.marker .object-label rect:not(.label-touch)",
   );
+  expect((await label.boundingBox()).height).toBeLessThan(30);
+  await page
+    .locator(
+      mobile(page)
+        ? '#command-bar [data-action="edit"]'
+        : '#inspector [data-action="edit"]',
+    )
+    .click();
+  const labelBefore = await label.boundingBox();
+  await page.mouse.move(
+    labelBefore.x + labelBefore.width / 2,
+    labelBefore.y + labelBefore.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    labelBefore.x + labelBefore.width / 2 + 30,
+    labelBefore.y + labelBefore.height / 2 - 10,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await label.boundingBox()).x - labelBefore.x)
+    .toBeCloseTo(30, 0);
+  await expect
+    .poll(async () => (await label.boundingBox()).y - labelBefore.y)
+    .toBeCloseTo(-10, 0);
+  const labelAfter = await label.boundingBox();
+  expect(labelAfter.x - labelBefore.x).toBeCloseTo(30, 0);
+  expect(labelAfter.y - labelBefore.y).toBeCloseTo(-10, 0);
+  await page.locator('#command-bar [data-action="finish"]').click();
+  await info.attach("automatic-size-zoom17", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  for (let i = 0; i < 4; i++)
+    await page.locator('[data-action="zoom-in"]').click();
+  expect((await shape.boundingBox()).width).toBeLessThanOrEqual(49);
+  expect((await label.boundingBox()).height).toBeLessThan(30);
+  for (let i = 0; i < 6; i++)
+    await page.locator('[data-action="zoom-out"]').click();
   expect(
     Number(
       await page.locator(".map-object.marker .object-hit").getAttribute("r"),
@@ -173,7 +209,7 @@ test("marker, label and line size follow zoom while touch targets retain minimum
         .locator(".map-object.line .object-shape")
         .getAttribute("stroke-width"),
     ),
-  ).toBe(5);
+  ).toBeGreaterThan(7);
   await page.locator('[data-action="zoom-in"]').click();
   await expect(page.locator(".map-object.line .object-shape")).toHaveAttribute(
     "stroke-width",
@@ -244,4 +280,71 @@ test("booth, guard and police symbols render in map, export and saved data", asy
   await expect(
     page.locator(".object-label text").filter({ hasText: "안전요원 1" }),
   ).toHaveCount(1);
+});
+
+test("pre-update project at zoom 17 receives compact automatic sizing without losing deployment data", async ({
+  page,
+}, info) => {
+  const legacy = newProject("이전 현장");
+  delete legacy.settings.autoSize;
+  legacy.view.zoom = 17;
+  const oldMarker = newObject(
+    "marker",
+    "control",
+    [legacy.view.center],
+    "통제지점 1",
+  );
+  oldMarker.label.text =
+    "통제지점 1 · 행사장 서측 관계자 출입과 긴급차량 통행 관리";
+  oldMarker.operations.team = "교통 A팀";
+  oldMarker.operations.quantity = 2;
+  legacy.objects = [oldMarker];
+  await page.locator("#import-file").setInputFiles({
+    name: "pre-update.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(legacy)),
+  });
+  await page.locator('[data-action="confirm-dialog"]').click();
+  await expect(page.locator("#toast")).toContainText("가져오기");
+  await close(page);
+  let zoom = Number(await page.locator("#zoom-level").textContent());
+  while (zoom > 17) {
+    await page.locator('[data-action="zoom-out"]').click();
+    zoom--;
+  }
+  while (zoom < 17) {
+    await page.locator('[data-action="zoom-in"]').click();
+    zoom++;
+  }
+  const marker = page.locator(".map-object.marker .object-shape");
+  await expect(marker).toBeVisible();
+  expect((await marker.boundingBox()).width).toBeLessThanOrEqual(49);
+  expect(
+    (await page.locator(".object-label rect:not(.label-touch)").boundingBox())
+      .height,
+  ).toBeLessThan(30);
+  expect(
+    (await page.locator(".object-label rect:not(.label-touch)").boundingBox())
+      .width,
+  ).toBeLessThanOrEqual(181);
+  await info.attach("existing-control-point-zoom17", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await expect(page.locator("#save-status")).toContainText("완료");
+  await page.reload();
+  await expect(marker).toBeVisible();
+  expect((await marker.boundingBox()).width).toBeLessThanOrEqual(49);
+  const pending = page.waitForEvent("download");
+  await page.locator('.header-actions [data-action="more"]').click();
+  await page.locator('#modal [data-action="export"]').click();
+  const stream = await (await pending).createReadStream();
+  let data = "";
+  for await (const chunk of stream) data += chunk;
+  const restored = JSON.parse(data).project;
+  expect(restored.settings.autoSize).toBe(true);
+  expect(restored.objects[0].position).toEqual(oldMarker.position);
+  expect(restored.objects[0].name).toBe(oldMarker.name);
+  expect(restored.objects[0].label.text).toBe(oldMarker.label.text);
+  expect(restored.objects[0].operations).toEqual(oldMarker.operations);
 });

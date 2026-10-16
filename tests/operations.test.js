@@ -8,7 +8,7 @@ import {
   parseImport,
   clone,
 } from "../src/model.js";
-import { zoomScale, elementScale } from "../src/scaling.js";
+import { zoomScale, elementScale, labelScale } from "../src/scaling.js";
 import {
   parkingCapacity,
   operationalSummary,
@@ -16,9 +16,10 @@ import {
 } from "../src/operations.js";
 import { History } from "../src/history.js";
 const point = { lat: 35.2, lng: 128.2 };
-test("map scale doubles every level, combines object size and keeps a fixed-screen option", () => {
+test("explicit proportional mode retains zoom ratios and saved size preferences", () => {
   const p = newProject(),
     o = newObject("marker", "parkingStaff", [point]);
+  p.settings.autoSize = false;
   assert.equal(elementScale(p, o, 16), 1);
   assert.equal(elementScale(p, o, 17), 2);
   assert.equal(elementScale(p, o, 14), 0.25);
@@ -29,9 +30,10 @@ test("map scale doubles every level, combines object size and keeps a fixed-scre
   assert.equal(zoomScale(p, 19), 1);
   assert.equal(elementScale(p, o, 19), 3);
 });
-test("pre-upgrade projects preserve their saved appearance and gain operational defaults", () => {
+test("pre-upgrade projects gain automatic sizing while retaining coordinates and saved preferences", () => {
   const p = newProject();
   p.view.zoom = 18;
+  delete p.settings.autoSize;
   delete p.settings.referenceZoom;
   delete p.settings.scaleWithMap;
   delete p.settings.symbolSize;
@@ -42,7 +44,9 @@ test("pre-upgrade projects preserve their saved appearance and gain operational 
   p.objects = [o];
   const n = migrate(p).project;
   assert.equal(n.settings.referenceZoom, 18);
-  assert.equal(elementScale(n, n.objects[0], 18), 1);
+  assert.equal(n.settings.autoSize, true);
+  assert.deepEqual(n.objects[0].position, point);
+  assert.equal(n.objects[0].style.scale, 1);
   assert.equal(n.objects[0].operations.quantity, 1);
   assert.equal(n.meta.plan.parkingAreaPerCar, 30);
   assert.deepEqual(parseImport(exportProject(n)).projects[0], n);
@@ -119,5 +123,40 @@ test("operational plan and assignments participate in undo, redo and file roundt
   assert.deepEqual(
     parseImport(exportProject(redo)).projects[0].objects,
     redo.objects,
+  );
+});
+
+test("automatic annotations remain bounded across zoom, large preferences and compact viewports", () => {
+  const p = newProject(),
+    o = newObject("marker", "control", [point]);
+  for (const viewport of [
+    { width: 390, height: 851 },
+    { width: 320, height: 568 },
+    { width: 844, height: 286 },
+    { width: 1130, height: 830 },
+  ]) {
+    const small = viewport.width <= 600 || viewport.height <= 450;
+    let previous = 0;
+    for (let zoom = 6; zoom <= 21; zoom++) {
+      const scale = elementScale(p, o, zoom, viewport),
+        label = labelScale(p, o, zoom, viewport);
+      assert.ok(scale >= previous);
+      previous = scale;
+      assert.ok(52.2 * scale <= (small ? 42 : 49));
+      assert.ok(12 * label >= 9.9 && 12 * label <= 13.5);
+    }
+  }
+  p.settings.symbolSize = 3;
+  o.style.scale = 4;
+  const before = clone(p);
+  assert.ok(52.2 * elementScale(p, o, 21, { width: 390, height: 851 }) <= 42);
+  assert.ok(labelScale(p, o, 21, { width: 390, height: 851 }) <= 1.05);
+  assert.deepEqual(p, before);
+  p.settings.scaleWithMap = false;
+  assert.equal(elementScale(p, o, 6), elementScale(p, o, 21));
+  p.settings.autoSize = false;
+  assert.equal(
+    parseImport(exportProject(p)).projects[0].settings.autoSize,
+    false,
   );
 });

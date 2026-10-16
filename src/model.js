@@ -72,6 +72,7 @@ export function newProject(title = "새 행사 운영도") {
       layers: { area: true, line: true, marker: true },
       labels: true,
       snap: true,
+      autoSize: true,
       scaleWithMap: true,
       referenceZoom: 16,
       symbolSize: 1,
@@ -284,6 +285,7 @@ export function migrate(input) {
     };
   }
   p.settings.scaleWithMap = s.scaleWithMap !== false;
+  p.settings.autoSize = s.autoSize !== false;
   // Anchor pre-upgrade screen offsets and symbol sizes at their saved zoom.
   p.settings.referenceZoom = number(s.referenceZoom, p.view.zoom, 6, 21);
   p.settings.symbolSize = number(s.symbolSize, 1, 0.25, 3);

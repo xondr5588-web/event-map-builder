@@ -1,6 +1,6 @@
 import { kindInfo } from "./catalog.js";
 import { markerArtwork } from "./symbols.js";
-import { elementScale, zoomScale } from "./scaling.js";
+import { elementScale, labelScale } from "./scaling.js";
 import { center, length, meters, samples, distance } from "./geometry.js";
 export const escapeHTML = (s) =>
   String(s ?? "").replace(
@@ -81,10 +81,11 @@ export class Renderer {
       label,
       leader,
       labelTouch: el("rect", { fill: "transparent", class: "label-touch" }),
+      labelTitle: el("title"),
       signature: "",
       decoKey: "",
     };
-    label.append(entry.labelTouch);
+    label.append(entry.labelTouch, entry.labelTitle);
     this.entries.set(o.id, entry);
     return entry;
   }
@@ -97,9 +98,12 @@ export class Renderer {
   ) {
     const { width, height } = this.map.size;
     attr(this.svg, "viewBox", `0 0 ${width} ${height}`);
-    const patternScale =
-      zoomScale(project, this.map.view.zoom) *
-      (project.settings.symbolSize || 1);
+    const patternScale = elementScale(
+      project,
+      { type: "line", style: { scale: 1 } },
+      this.map.view.zoom,
+      this.map.size,
+    );
     for (const pattern of this.svg.querySelectorAll("defs pattern"))
       attr(pattern, "patternTransform", `rotate(45) scale(${patternScale})`);
     const keep = new Set(),
@@ -119,7 +123,8 @@ export class Renderer {
       );
       attr(e.group, "aria-label", `${o.name} (${kindInfo(o)[0]})`);
       const pts = (o.path || [o.position]).map((p) => this.map.project(p)),
-        scale = elementScale(project, o, this.map.view.zoom);
+        scale = elementScale(project, o, this.map.view.zoom, this.map.size),
+        textScale = labelScale(project, o, this.map.view.zoom, this.map.size);
       attr(e.group, "data-render-scale", scale);
       if (o.type === "marker") {
         attr(
@@ -231,13 +236,15 @@ export class Renderer {
       const anchor = this.map.project(
         o.label.position || o.position || center(o.path),
       );
-      let x = anchor.x + o.label.dx * scale,
-        y = anchor.y + o.label.dy * scale;
+      let x = anchor.x + o.label.dx * textScale,
+        y = anchor.y + o.label.dy * textScale;
       if (!o.label.manual && !o.label.position) {
-        const key = `${Math.round(x / (130 * scale))}:${Math.round(y / (32 * scale))}`,
+        if (o.type === "marker" && project.settings.autoSize !== false)
+          y = Math.max(y, anchor.y + 26 * scale + 13 * textScale + 6);
+        const key = `${Math.round(x / (130 * textScale))}:${Math.round(y / (32 * textScale))}`,
           count = buckets.get(key) || 0;
         buckets.set(key, count + 1);
-        y += count * 30 * scale;
+        y += count * 30 * textScale;
       }
       const show =
         project.settings.labels &&
@@ -250,7 +257,22 @@ export class Renderer {
           o.kind === "measure"
             ? `${o.label.text} · ${meters(length(o.path))}`
             : o.label.text;
-        const shown = labelText.slice(0, 80);
+        const limit =
+          project.settings.autoSize !== false
+            ? Math.max(90, Math.min(180, width * 0.42)) / textScale - 18
+            : Infinity;
+        let shown = "",
+          used = 0;
+        for (const c of labelText.slice(0, 80)) {
+          const cw = /[\u1100-\uffff]/.test(c) ? 12 : 7;
+          if (used + cw + 12 > limit) {
+            shown += "…";
+            break;
+          }
+          shown += c;
+          used += cw;
+        }
+        e.labelTitle.textContent = labelText;
         e.label.children[1].textContent = shown;
         const w = Math.max(
           44,
@@ -261,9 +283,9 @@ export class Renderer {
         );
         attr(e.label.firstChild, "width", w);
         attr(e.label.firstChild, "x", -w / 2);
-        attr(e.label, "transform", `translate(${x},${y}) scale(${scale})`);
-        const tw = Math.max(w, 44 / scale),
-          th = Math.max(26, 44 / scale);
+        attr(e.label, "transform", `translate(${x},${y}) scale(${textScale})`);
+        const tw = Math.max(w, 44 / textScale),
+          th = Math.max(26, 44 / textScale);
         attr(e.labelTouch, "x", -tw / 2);
         attr(e.labelTouch, "y", -th / 2);
         attr(e.labelTouch, "width", tw);

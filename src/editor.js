@@ -1,12 +1,13 @@
 import { clone, newObject } from "./model.js";
 import { kindInfo } from "./catalog.js";
-import { elementScale } from "./scaling.js";
+import { labelScale } from "./scaling.js";
 import {
   area,
   length,
   meters,
   squareMeters,
   pointsOf,
+  center,
   validCoord,
 } from "./geometry.js";
 export class Editor {
@@ -149,6 +150,17 @@ export class Editor {
       index = Number(e.target.closest("[data-index]")?.dataset.index);
     const o = this.project.objects.find((o) => o.id === id),
       editable = this.editing && this.selection.has(id) && !o?.locked;
+    const label =
+        editable && handle === "label"
+          ? target?.querySelector(".object-label")
+          : null,
+      transform = label?.transform.baseVal.numberOfItems
+        ? label.transform.baseVal.getItem(0).matrix
+        : null,
+      labelAnchor =
+        transform && o
+          ? this.map.project(o.label.position || o.position || center(o.path))
+          : null;
     this.drag = {
       start: p,
       last: p,
@@ -161,6 +173,12 @@ export class Editor {
       before: editable ? clone(this.project) : null,
       startCoord: this.map.unproject(p),
       original: editable ? clone(o) : null,
+      labelOffset: labelAnchor
+        ? {
+            x: transform.e - labelAnchor.x,
+            y: transform.f - labelAnchor.y,
+          }
+        : null,
     };
     if (editable) this.preview = clone(this.cb.project());
     if (e.pointerType !== "mouse" && id && !this.tool) {
@@ -212,9 +230,22 @@ export class Editor {
       const o = this.project.objects.find((o) => o.id === d.id);
       if (!o) return;
       if (d.handle === "label") {
-        const scale = elementScale(this.project, o, this.map.view.zoom);
-        o.label.dx = d.original.label.dx + (p.x - d.start.x) / scale;
-        o.label.dy = d.original.label.dy + (p.y - d.start.y) / scale;
+        const scale = labelScale(
+          this.project,
+          o,
+          this.map.view.zoom,
+          this.map.size,
+        );
+        o.label.dx =
+          ((d.labelOffset?.x ?? d.original.label.dx * scale) +
+            p.x -
+            d.start.x) /
+          scale;
+        o.label.dy =
+          ((d.labelOffset?.y ?? d.original.label.dy * scale) +
+            p.y -
+            d.start.y) /
+          scale;
         o.label.manual = true;
       } else if (d.handle === "vertex") {
         const v = this.snap(this.map.unproject(p), o.id);
