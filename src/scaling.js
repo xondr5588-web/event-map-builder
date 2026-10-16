@@ -21,7 +21,7 @@ export function elementScale(project, object, zoom, viewport) {
   if (project.settings.autoSize === false) return scale;
   const small = compact(viewport);
   return object.type === "marker"
-    ? clamp(scale * (small ? 0.6 : 0.68), 0.42, small ? 0.8 : 0.92)
+    ? clamp(scale * (small ? 0.6 : 0.68), 0.42, small ? 0.76 : 0.88)
     : clamp(scale, 0.55, small ? 1.35 : 1.6);
 }
 export function labelScale(project, object, zoom, viewport) {
@@ -33,6 +33,6 @@ export function labelScale(project, object, zoom, viewport) {
       sizePreference(project, object) *
       (small ? 0.9 : 0.95),
     small ? 0.83 : 0.88,
-    small ? 1.05 : 1.12,
+    1.05,
   );
 }

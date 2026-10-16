@@ -142,14 +142,14 @@ test("automatic annotations remain bounded across zoom, large preferences and co
         label = labelScale(p, o, zoom, viewport);
       assert.ok(scale >= previous);
       previous = scale;
-      assert.ok(52.2 * scale <= (small ? 42 : 49));
+      assert.ok(55 * scale <= (small ? 42 : 49));
       assert.ok(12 * label >= 9.9 && 12 * label <= 13.5);
     }
   }
   p.settings.symbolSize = 3;
   o.style.scale = 4;
   const before = clone(p);
-  assert.ok(52.2 * elementScale(p, o, 21, { width: 390, height: 851 }) <= 42);
+  assert.ok(55 * elementScale(p, o, 21, { width: 390, height: 851 }) <= 42);
   assert.ok(labelScale(p, o, 21, { width: 390, height: 851 }) <= 1.05);
   assert.deepEqual(p, before);
   p.settings.scaleWithMap = false;

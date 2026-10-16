@@ -259,7 +259,7 @@ export class Renderer {
             : o.label.text;
         const limit =
           project.settings.autoSize !== false
-            ? Math.max(90, Math.min(180, width * 0.42)) / textScale - 18
+            ? Math.max(90, Math.min(180, width * 0.42)) / textScale - 20
             : Infinity;
         let shown = "",
           used = 0;
