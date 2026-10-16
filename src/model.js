@@ -5,6 +5,11 @@ export const uid = () => globalThis.crypto.randomUUID();
 export const clone = (x) => structuredClone(x);
 const text = (s, fallback = "") =>
   typeof s === "string" ? s.slice(0, 2000) : fallback;
+const validId = (s) =>
+  typeof s === "string" &&
+  s.length > 0 &&
+  s.length <= 120 &&
+  !/[<>"'&\u0000-\u001f]/.test(s);
 const number = (v, fallback, min, max) =>
   Number.isFinite(Number(v)) && v !== null && v !== ""
     ? clamp(Number(v), min, max)
@@ -153,8 +158,7 @@ function normalizeObject(raw, type, index, ids, warnings, legacyLayer = {}) {
     points.map((p) => coord(p, name)),
     name,
   );
-  if (typeof raw.id === "string" && raw.id.length <= 120 && !ids.has(raw.id))
-    o.id = raw.id;
+  if (validId(raw.id) && !ids.has(raw.id)) o.id = raw.id;
   else if (raw.id)
     warnings.push("중복 또는 잘못된 객체 ID를 새 ID로 교체했습니다.");
   ids.add(o.id);
@@ -240,7 +244,7 @@ export function migrate(input) {
   if (!modern && !old && !oldest)
     throw new Error("지원하지 않는 JSON 구조입니다.");
   const p = newProject(text(raw.title, text(raw.meta?.title, "가져온 운영도")));
-  if (typeof raw.id === "string" && raw.id.length <= 120) p.id = raw.id;
+  if (validId(raw.id)) p.id = raw.id;
   p.createdAt = number(raw.createdAt, p.createdAt, 0, 8640000000000000);
   p.updatedAt = number(
     raw.updatedAt ?? input.ts,
@@ -330,6 +334,8 @@ export function migrate(input) {
     throw new Error("프로젝트당 객체는 10,000개까지 지원합니다.");
   const warnings = [],
     ids = new Set();
+  if (raw.id && !validId(raw.id))
+    warnings.push("잘못된 프로젝트 ID를 새 ID로 교체했습니다.");
   let vertices = 0;
   p.objects = entries.map((o, i) => {
     const n = normalizeObject(o, o.type, i, ids, warnings, s);

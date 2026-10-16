@@ -13,6 +13,26 @@ import { distance, area, world, unworld, samples } from "../src/geometry.js";
 const a = { lat: 35, lng: 128 },
   b = { lat: 35, lng: 128.001 },
   c = { lat: 35.001, lng: 128 };
+test("import repairs markup-bearing IDs while preserving geometry and ordinary legacy IDs", () => {
+  const p = newProject("기존 행사"),
+    marker = newObject("marker", "parkingStaff", [a]),
+    line = newObject("line", "vehicle", [a, b]);
+  p.id = 'bad"><svg onload="alert(1)">';
+  marker.id = 'marker" onclick="alert(1)';
+  line.id = "구역_A:01";
+  p.objects = [marker, line];
+  const {
+    projects: [project],
+    warnings,
+  } = parseImport(exportProject(p));
+  assert.match(project.id, /^[0-9a-f-]{36}$/);
+  assert.match(project.objects[0].id, /^[0-9a-f-]{36}$/);
+  assert.equal(project.objects[1].id, "구역_A:01");
+  assert.deepEqual(project.objects[0].position, a);
+  assert.deepEqual(project.objects[1].path, [a, b]);
+  assert.equal(warnings.length, 2);
+  assert.equal(project.title, p.title);
+});
 const legacy = {
   areas: [{ id: "same", kind: "parking", name: "A", path: [a, b, c] }],
   lines: [{ id: "same", kind: "oneway", name: "차량", path: [a, b] }],
