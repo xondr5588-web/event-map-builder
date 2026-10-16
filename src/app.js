@@ -621,7 +621,7 @@ function settings() {
 function help() {
   modal(
     "FIELD 사용법",
-    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>객체 선택 → 위치 편집</b>에서 마커, 도형, 흰 점, 라벨을 드래그하세요. 작은 +를 누르면 점이 추가됩니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
+    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>객체 선택 → 위치 편집</b>에서 마커, 도형, 흰 점, 라벨을 드래그하세요. 작은 +를 누르면 점이 추가됩니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>운영계획</b>에서 행사·문서 정보를 관리하고, 객체 속성의 <b>현장 배치 정보</b>에 팀·인원·시간·업무지시를 입력하세요. 집계·배치표 CSV·운영계획서 PDF로 연결됩니다.</li><li><b>지도 · 저장 설정</b>에서 축척 연동·전체 크기·기준 확대 수준을 바꿀 수 있습니다. 객체 속성에서는 개별 요소 크기를 조정합니다.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
   );
 }
 async function importFile(file) {
@@ -659,7 +659,7 @@ async function install() {
   }
   modal(
     "홈 화면에 설치",
-    `<div class="stack"><p class="muted"><b>Android Chrome / Samsung Internet</b><br>브라우저 메뉴 → 앱 설치 또는 홈 화면에 추가</p><p class="muted"><b>iPhone / iPad Safari</b><br>공유 버튼 → 홈 화면에 추가 → 추가</p><p class="muted">HTTPS에서 한 번 실행한 후 앱 화면을 오프라인으로 열 수 있습니다. 배경지도와 주소 검색에는 인터넷이 필요합니다. 설치와 브라우저가 저장 공간을 별도로 사용할 수 있으므로 먼저 JSON 백업을 권장합니다.</p></div>`,
+    `<div class="stack"><p class="muted"><b>Android Chrome / Samsung Internet</b><br>브라우저 메뉴 → 앱 설치 또는 홈 화면에 추가</p><p class="muted"><b>iPhone / iPad Safari</b><br>공유 버튼 → 홈 화면에 추가 → 추가</p><p class="muted">${PRIVATE_MODE ? "비공개 앱을 다시 열 때는 인터넷 연결과 소유자 로그인이 필요합니다. 열려 있는 편집기의 작업은 기기에 계속 저장됩니다." : "HTTPS에서 한 번 실행한 후 앱 화면을 오프라인으로 열 수 있습니다. 배경지도와 주소 검색에는 인터넷이 필요합니다."} 설치와 브라우저가 저장 공간을 별도로 사용할 수 있으므로 먼저 JSON 백업을 권장합니다.</p></div>`,
   );
 }
 const actions = {

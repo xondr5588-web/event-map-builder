@@ -73,11 +73,13 @@ test("operational assignments, plan, CSV and report survive reload", async ({
   });
   if (info.project.name === "desktop") {
     const pdf = await page.pdf({
-      format: "A4",
-      landscape: true,
+      preferCSSPageSize: true,
       printBackground: true,
     });
     expect(pdf.length).toBeGreaterThan(5000);
+    expect(
+      (pdf.toString("latin1").match(/\/Type \/Page\b/g) || []).length,
+    ).toBe(1);
     await info.attach("operations-plan-pdf", {
       body: pdf,
       contentType: "application/pdf",
@@ -120,6 +122,30 @@ test("marker, label and line size follow zoom while touch targets retain minimum
       await page.locator(".map-object.marker .object-hit").getAttribute("r"),
     ),
   ).toBeGreaterThanOrEqual(24);
+  await page
+    .locator(
+      mobile(page)
+        ? '#command-bar [data-action="edit"]'
+        : '#inspector [data-action="edit"]',
+    )
+    .click();
+  const grip = page.locator(".marker-move");
+  await expect(grip).toBeVisible();
+  const original = await grip.getAttribute("transform");
+  const gripBox = await grip.boundingBox();
+  await page.mouse.move(
+    gripBox.x + gripBox.width / 2,
+    gripBox.y + gripBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    gripBox.x + gripBox.width / 2 + 28,
+    gripBox.y + gripBox.height / 2 - 16,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  await expect(grip).not.toHaveAttribute("transform", original);
+  await page.locator('#command-bar [data-action="finish"]').click();
   await panel(page, "tools");
   await page.locator('[data-tool="line:vehicle"]').click();
   const box = await page.locator("#editor").boundingBox();
@@ -157,7 +183,16 @@ test("field symbols and police emblem render consistently in tools and map", asy
       .locator('.map-object.marker [data-symbol="police-emblem"] path')
       .count(),
   ).toBeGreaterThan(10);
-  await choose(page, "shuttle");
+  const mapBox = await page.locator("#editor").boundingBox();
+  await page
+    .locator("#editor")
+    .click({ position: { x: mapBox.width * 0.7, y: mapBox.height * 0.35 } });
+  await panel(page, "tools");
+  await page.locator('[data-tool="marker:shuttle"]').last().click();
+  await page
+    .locator("#editor")
+    .click({ position: { x: mapBox.width * 0.7, y: mapBox.height * 0.35 } });
+  await page.locator('[data-action="finish"]').click();
   await close(page);
   await expect(page.locator(".map-object.marker")).toHaveCount(2);
   await expect(

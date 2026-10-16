@@ -306,6 +306,10 @@ export class Renderer {
           )
         : null;
     let handles = "";
+    if (edit?.type === "marker") {
+      const q = this.map.project(edit.position);
+      handles = `<g data-object="${edit.id}" data-handle="move" transform="translate(${q.x},${q.y})" class="marker-move"><circle r="24" fill="transparent"/><circle r="9" fill="white" stroke="#16615a" stroke-width="2.5"/><path d="M-5 0H5M0-5V5" stroke="#16615a" stroke-width="2" pointer-events="none"/></g>`;
+    }
     if (edit?.path) {
       edit.path.forEach((p, i) => {
         const q = this.map.project(p);

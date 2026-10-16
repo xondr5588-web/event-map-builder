@@ -65,7 +65,7 @@ export function reportHTML(p) {
       .map((o) => {
         const op = o.operations,
           c = parkingCapacity(o, p);
-        return `<tr><td>${o.type === "marker" ? markerSymbol(o.kind, 28) : ""}<b>${esc(o.name)}</b><small>${esc(o.group)}</small></td><td>${esc(op.team || "미지정")}<small>${esc(op.contact)}</small></td><td>${esc(objectMeasure(o))}${c ? `<small>${num(c.count)}대 · ${c.estimated ? "면적 추정" : "직접 입력"}</small>` : ""}</td><td>${esc(op.start || plan.startTime || "—")}<br/>~ ${esc(op.end || plan.endTime || "—")}</td><td>${DEPLOY_STATUS[op.status]}</td><td class="report-note">${esc(op.note)}</td></tr>`;
+        return `<tr><td data-column="종류·명칭">${o.type === "marker" ? markerSymbol(o.kind, 28) : ""}<b>${esc(o.name)}</b><small>${esc(o.group)}</small></td><td data-column="담당팀·연락처">${esc(op.team || "미지정")}<small>${esc(op.contact)}</small></td><td data-column="수량·규모">${esc(objectMeasure(o))}${c ? `<small>${num(c.count)}대 · ${c.estimated ? "면적 추정" : "직접 입력"}</small>` : ""}</td><td data-column="운영시간">${esc(op.start || plan.startTime || "—")}<br/>~ ${esc(op.end || plan.endTime || "—")}</td><td data-column="배치 상태">${DEPLOY_STATUS[op.status]}</td><td class="report-note" data-column="업무지시">${esc(op.note)}</td></tr>`;
       })
       .join("") || '<tr><td colspan="6">배치한 요소가 없습니다.</td></tr>'
   }</tbody></table><footer class="report-footer">작성·출력 ${new Date().toLocaleString("ko-KR")} · FIELD · 주차 추정값과 배치 계획은 현장 여건에 따라 확인·조정하세요.</footer>`;
@@ -79,16 +79,14 @@ export function openReport(p, onCSV) {
   document.body.classList.add("report-mode");
   document.getElementById("report-close").onclick = closeReport;
   document.getElementById("report-csv").onclick = onCSV;
-  document.getElementById("report-print").onclick = () => {
-    let style = document.getElementById("page-size");
-    if (!style) {
-      style = document.createElement("style");
-      style.id = "page-size";
-      document.head.append(style);
-    }
-    style.textContent = "@page { size: A4 landscape; margin: 12mm; }";
-    window.print();
-  };
+  let style = document.getElementById("page-size");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "page-size";
+    document.head.append(style);
+  }
+  style.textContent = "@page { size: A4 landscape; margin: 12mm; }";
+  document.getElementById("report-print").onclick = () => window.print();
 }
 export function closeReport() {
   document.getElementById("operations-report")?.remove();

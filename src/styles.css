@@ -1983,4 +1983,103 @@ kbd {
   .report-paper .resource-list {
     grid-template-columns: repeat(4, 1fr);
   }
+  .report-paper {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .report-heading {
+    padding-bottom: 9px;
+    margin-bottom: 12px;
+  }
+  .report-heading h1 {
+    font-size: 22px;
+    margin: 5px 0;
+  }
+  .report-heading p,
+  .report-meta span {
+    font-size: 9px;
+  }
+  .report-meta {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0 14px;
+  }
+  .report-meta b {
+    font-size: 11px;
+  }
+  .report-paper h2 {
+    font-size: 13px;
+    margin: 14px 0 6px;
+  }
+  .report-paper .plan-metrics {
+    margin: 8px 0;
+    gap: 7px;
+  }
+  .report-paper .plan-metrics > div {
+    padding: 8px;
+  }
+  .report-paper .plan-metrics b {
+    font-size: 18px;
+  }
+  .report-paper .resource-list {
+    margin: 10px 0;
+    font-size: 10px;
+  }
+  .report-paper table {
+    font-size: 10px;
+  }
+  .report-paper th,
+  .report-paper td {
+    padding: 5px;
+  }
+  .report-paper small {
+    font-size: 9px;
+  }
+  .report-paper td svg {
+    width: 22px;
+    height: 22px;
+  }
+  .report-footer {
+    font-size: 9px;
+    margin-top: 14px;
+    padding-top: 8px;
+  }
+}
+@media screen and (max-width: 760px) {
+  .report-paper .deployment-table,
+  .report-paper .deployment-table tbody {
+    display: block;
+  }
+  .report-paper .deployment-table thead {
+    display: none;
+  }
+  .report-paper .deployment-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    border: 1px solid #d6e2d9;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    padding: 5px;
+  }
+  .report-paper .deployment-table td {
+    display: block;
+    border: 0;
+    padding: 8px;
+    font-size: 12px;
+  }
+  .report-paper .deployment-table td:first-child,
+  .report-paper .deployment-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .report-paper .deployment-table td::before {
+    content: attr(data-column);
+    display: block;
+    font-size: 10px;
+    color: #718275;
+    margin-bottom: 5px;
+  }
+  .report-paper .deployment-table td:first-child svg {
+    float: left;
+    margin-right: 9px;
+  }
 }
