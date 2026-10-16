@@ -36,7 +36,7 @@ export async function exportOverlayPNG(svg, title) {
   copy.setAttribute("height", size.height * 2);
   const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
   style.textContent =
-    ".object-hit{display:none}.object-label rect{fill:white;stroke:#b9c8ca}.object-label text{font:600 12px sans-serif;fill:#163432}.marker-halo{fill:white}";
+    ".object-hit,.label-touch{display:none}.object-label rect{fill:white;stroke:#b9c8ca}.object-label text{font:600 12px sans-serif;fill:#163432}.marker-halo{fill:white}";
   copy.prepend(style);
   const source = new Blob([new XMLSerializer().serializeToString(copy)], {
       type: "image/svg+xml;charset=utf-8",

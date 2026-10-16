@@ -1,5 +1,6 @@
 import { clone, newObject } from "./model.js";
 import { kindInfo } from "./catalog.js";
+import { elementScale } from "./scaling.js";
 import {
   area,
   length,
@@ -211,8 +212,9 @@ export class Editor {
       const o = this.project.objects.find((o) => o.id === d.id);
       if (!o) return;
       if (d.handle === "label") {
-        o.label.dx = d.original.label.dx + p.x - d.start.x;
-        o.label.dy = d.original.label.dy + p.y - d.start.y;
+        const scale = elementScale(this.project, o, this.map.view.zoom);
+        o.label.dx = d.original.label.dx + (p.x - d.start.x) / scale;
+        o.label.dy = d.original.label.dy + (p.y - d.start.y) / scale;
         o.label.manual = true;
       } else if (d.handle === "vertex") {
         const v = this.snap(this.map.unproject(p), o.id);

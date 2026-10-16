@@ -1,5 +1,7 @@
 import { kindInfo } from "./catalog.js";
 import { escapeHTML } from "./renderer.js";
+import { markerSymbol } from "./symbols.js";
+import { PLAN_STATUS, STAFF_KINDS } from "./operations.js";
 export class PrintView {
   constructor(map, editor, project) {
     this.map = map;
@@ -16,6 +18,7 @@ export class PrintView {
       this.layout();
     });
     window.addEventListener("beforeprint", () => {
+      if (document.body.classList.contains("report-mode")) return;
       if (!this.active) this.enter();
       this.map.resize();
       this.editor.request();
@@ -27,9 +30,19 @@ export class PrintView {
     this.active = true;
     const p = this.project();
     document.getElementById("print-title").textContent = p.title;
-    document.getElementById("print-note").textContent = p.meta.note || "";
+    const plan = p.meta.plan;
+    document.getElementById("print-note").textContent = [
+      plan.venue,
+      [plan.startDate, plan.endDate].filter(Boolean).join(" ~ "),
+      plan.organizer,
+      plan.agency,
+      plan.manager && `총괄 ${plan.manager} ${plan.phone}`,
+      p.meta.note,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     document.getElementById("print-date").textContent =
-      new Date().toLocaleDateString("ko-KR");
+      `${plan.documentNo ? plan.documentNo + " · " : ""}개정 ${plan.revision} · ${PLAN_STATUS[plan.status]} · ${new Date().toLocaleDateString("ko-KR")}`;
     const kinds = new Map();
     for (const o of p.objects)
       if (o.visible && p.settings.layers[o.type]) {
@@ -39,13 +52,15 @@ export class PrintView {
             label: kindInfo(o)[0],
             color: o.style.color,
             count: 0,
+            type: o.type,
+            kind: o.kind,
           });
-        kinds.get(key).count++;
+        kinds.get(key).count += o.type === "marker" ? o.operations.quantity : 1;
       }
     document.getElementById("print-legend").innerHTML = [...kinds.values()]
       .map(
         (k) =>
-          `<span><i style="background:${k.color}"></i>${escapeHTML(k.label)} <b>${k.count}</b></span>`,
+          `<span>${k.type === "marker" ? markerSymbol(k.kind, 22) : `<i style="background:${k.color}"></i>`}${escapeHTML(k.label)} <b>${k.count}${k.type === "marker" && STAFF_KINDS.has(k.kind) ? "명" : ""}</b></span>`,
       )
       .join("");
     document.getElementById("print-controls").hidden = false;

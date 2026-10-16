@@ -20,6 +20,38 @@ const color = (v, fallback) =>
           .map((c) => c + c)
           .join("")
       : fallback;
+export function defaultPlan() {
+  return {
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+    venue: "",
+    organizer: "",
+    agency: "",
+    manager: "",
+    phone: "",
+    documentNo: "",
+    revision: "1",
+    status: "draft",
+    expectedVisitors: 0,
+    parkingAreaPerCar: 30,
+  };
+}
+function normalizePlan(raw = {}) {
+  const plan = defaultPlan();
+  for (const key of Object.keys(plan))
+    if (typeof plan[key] === "string")
+      plan[key] = text(raw?.[key], plan[key]).slice(0, 120);
+  plan.status = ["draft", "review", "final"].includes(raw?.status)
+    ? raw.status
+    : "draft";
+  plan.expectedVisitors = Math.floor(
+    number(raw?.expectedVisitors, 0, 0, 10000000),
+  );
+  plan.parkingAreaPerCar = number(raw?.parkingAreaPerCar, 30, 10, 200);
+  return plan;
+}
 export function newProject(title = "새 행사 운영도") {
   const now = Date.now();
   return {
@@ -35,8 +67,11 @@ export function newProject(title = "새 행사 운영도") {
       layers: { area: true, line: true, marker: true },
       labels: true,
       snap: true,
+      scaleWithMap: true,
+      referenceZoom: 16,
+      symbolSize: 1,
     },
-    meta: { note: "" },
+    meta: { note: "", plan: defaultPlan() },
   };
 }
 export function newObject(type, kind, points, name) {
@@ -58,6 +93,17 @@ export function newObject(type, kind, points, name) {
       width: type === "area" ? 3 : 6,
       opacity: type === "area" ? 0.2 : 1,
       spacing: kind === "cone" ? 7 : 40,
+      scale: 1,
+    },
+    operations: {
+      quantity: 1,
+      team: "",
+      contact: "",
+      start: "",
+      end: "",
+      note: "",
+      capacity: null,
+      status: "planned",
     },
     label: {
       text: name || info[0],
@@ -136,6 +182,23 @@ function normalizeObject(raw, type, index, ids, warnings, legacyLayer = {}) {
       1,
       500,
     ),
+    scale: number(st.scale, 1, 0.25, 4),
+  };
+  const op = raw.operations || {};
+  o.operations = {
+    quantity: Math.round(number(op.quantity, 1, 1, 9999)),
+    team: text(op.team).slice(0, 120),
+    contact: text(op.contact).slice(0, 120),
+    start: text(op.start).slice(0, 80),
+    end: text(op.end).slice(0, 80),
+    note: text(op.note),
+    capacity:
+      op.capacity == null || op.capacity === ""
+        ? null
+        : Math.floor(number(op.capacity, 0, 0, 100000)),
+    status: ["planned", "confirmed", "deployed"].includes(op.status)
+      ? op.status
+      : "planned",
   };
   o.rotation = number(raw.rotation, 0, -36000, 36000) % 360;
   o.visible = raw.visible !== false;
@@ -190,6 +253,7 @@ export function migrate(input) {
     p.deletedAt = raw.deletedAt;
   p.meta = {
     note: text(raw.meta?.note),
+    plan: normalizePlan(raw.meta?.plan),
     ...(oldest
       ? { migratedFrom: "parking/flow/staff" }
       : old
@@ -215,6 +279,10 @@ export function migrate(input) {
         : "hybrid",
     };
   }
+  p.settings.scaleWithMap = s.scaleWithMap !== false;
+  // Anchor pre-upgrade screen offsets and symbol sizes at their saved zoom.
+  p.settings.referenceZoom = number(s.referenceZoom, p.view.zoom, 6, 21);
+  p.settings.symbolSize = number(s.symbolSize, 1, 0.25, 3);
   let entries;
   if (modern) entries = raw.objects;
   else if (old) {
