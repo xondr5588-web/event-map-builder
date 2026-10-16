@@ -1,0 +1,20 @@
+name: Retrieve public fire emblem
+on:
+  push:
+    branches: [assets/fire-emblem-source]
+permissions:
+  contents: read
+jobs:
+  emblem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve attributed public vector
+        run: |
+          mkdir -p emblem
+          curl --fail --retry 3 --location --user-agent 'FIELD-Event-Map/1.1 source attribution' 'https://upload.wikimedia.org/wikipedia/commons/8/88/National_Fire_Agency_of_the_Republic_of_Korea_Logo_%28vertical%29.svg' -o emblem/fire-original.svg
+          test $(wc -c < emblem/fire-original.svg) -gt 10000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fire-emblem-source
+          path: emblem/
+          retention-days: 1
