@@ -2,8 +2,11 @@
 
 네이버 지도 위에 구역, 동선, 근무자와 통제 시설을 배치하는 설치 가능한 정적 웹앱입니다. PC에서는 도구 패널과 속성 패널, 스마트폰에서는 지도 중심 화면과 하단 시트를 사용합니다. 프로젝트는 브라우저 안에 저장됩니다.
 
-**앱 주소:** https://xondr5588-web.github.io/event-map-builder/  
-GitHub Pages 배포가 활성화되어 있습니다. 네이버 지도 인증이 거부되면 아래 **네이버 지도 설정**의 허용 도메인과 API 사용 권한을 확인하세요. 이 경우에도 좌표 기반 편집과 로컬 저장·백업은 계속 사용할 수 있습니다.
+**비공개 앱:** https://field-event-map-private.sugaryseed3.chatgpt.site  
+소유자의 ChatGPT 계정으로 로그인해야 이용할 수 있습니다. 다른 계정은 허용되지 않습니다.
+
+**기존 주소:** https://xondr5588-web.github.io/event-map-builder/  
+기존 데이터 백업과 비공개 앱 안내만 제공합니다. 지도 SDK와 소유자의 지도 Client ID를 포함하지 않습니다. 기존 프로젝트를 옮기는 방법과 네이버 허용 도메인 변경은 [비공개 운영 전환](docs/PRIVATE-ACCESS.md)을 확인하세요.
 
 ## 시작하기
 
@@ -90,16 +93,16 @@ npm run format            # 소스 정리
 
 ## 네이버 지도 설정
 
-브라우저는 `https://oapi.map.naver.com/openapi/v3/maps.js`를 `ncpKeyId`로 로드한 뒤 `maps-geocoder.js`를 순서대로 로드합니다. 기존 공개 식별자 `b4anccamja`를 기본값으로 유지했습니다.
+브라우저는 `https://oapi.map.naver.com/openapi/v3/maps.js`를 `ncpKeyId`로 로드한 뒤 `maps-geocoder.js`를 순서대로 로드합니다. 공개 식별자는 환경 변수로만 지정합니다. 기본값은 비어 있으며, 설정하지 않으면 지도 API를 호출하지 않습니다.
 
 1. NAVER Cloud Platform의 **Maps** Application에서 **Dynamic Map**, 주소 검색에 필요한 **Geocoding** 권한과 사용 한도를 확인합니다.
-2. Web 서비스 URL/허용 도메인에 실제 사용하는 주소를 등록합니다. 예: `https://xondr5588-web.github.io`, 개발용 `http://localhost:5173`. 콘솔 안내에 맞춰 배포 도메인과 개발 주소를 각각 등록하세요.
-3. 새 식별자를 사용할 경우 `.env.local`에 `VITE_NAVER_MAP_CLIENT_ID=공개_식별자`를 넣고 다시 빌드합니다. GitHub Actions에서는 Repository **Variables**의 `NAVER_MAP_CLIENT_ID`를 사용합니다.
+2. Web 서비스 URL/허용 도메인에 실제 사용하는 주소를 등록합니다. 비공개 앱: `https://field-event-map-private.sugaryseed3.chatgpt.site`. 기존 GitHub Pages 도메인의 허용은 제거하세요. 개발에 필요한 주소만 별도로 등록합니다. 콘솔 안내에 맞춰 배포 도메인과 개발 주소를 각각 등록하세요.
+3. 새 식별자를 사용할 경우 `.env.local`에 `VITE_NAVER_MAP_CLIENT_ID=공개_식별자`를 넣고 다시 빌드합니다. GitHub Pages 백업 빌드는 지도 식별자를 사용하지 않습니다. 비공개 앱을 빌드할 때만 이 값을 지정합니다.
 4. 브라우저용 식별자는 공개됩니다. 허용 도메인 제한·할당량·사용량 알림을 설정하세요. Client Secret 등 비밀값을 `VITE_*`, 소스 또는 브라우저에 넣지 마세요.
 
 지도 네트워크·인증 오류가 나면 안내와 **지도 다시 연결** 버튼을 표시하고 배경 없는 좌표 도면에서 작업을 이어갈 수 있습니다. 네이버 지도 타일·주소 검색은 온라인 연결이 필요합니다.
 
-인증 오류가 계속되면 Maps Application의 공개 식별자가 `b4anccamja`인지, **Web 서비스 URL**에 `https://xondr5588-web.github.io`가 등록되어 있는지 확인하세요. 사용 중지·할당량 초과·Dynamic Map/Geocoding 미선택 여부도 확인합니다. 설정을 고친 뒤 앱의 **다시 시도**를 누르면 SDK부터 다시 연결합니다. 비밀키는 앱에 입력할 필요가 없습니다.
+인증 오류가 계속되면 Maps Application의 공개 식별자가 올바른지, **Web 서비스 URL**에 `https://field-event-map-private.sugaryseed3.chatgpt.site`가 등록되어 있는지 확인하세요. 사용 중지·할당량 초과·Dynamic Map/Geocoding 미선택 여부도 확인합니다. 설정을 고친 뒤 앱의 **다시 시도**를 누르면 SDK부터 다시 연결합니다. 비밀키는 앱에 입력할 필요가 없습니다.
 
 ### 장소명 검색 (선택적 서버)
 
@@ -126,13 +129,17 @@ PNG는 **직접 작성한 운영요소만** 투명 배경으로 내보냅니다.
 
 ## PWA·오프라인
 
+비공개 배포(`npm run build:private`)와 공개 백업 페이지(`npm run build:pages`)에서는 인증 보호를 위해 아래 오프라인 셸 캐싱을 사용하지 않습니다. 기존 셸 캐시를 정리하고 모든 새 요청을 호스팅 서버로 전달합니다. 열려 있는 편집기의 로컬 작업·저장은 계속 가능합니다. 다시 열 때는 온라인 인증이 필요합니다.
+
+일반 개발 빌드의 동작은 다음과 같습니다.
+
 manifest, 192/512 아이콘, maskable·Apple 아이콘과 Service Worker를 포함합니다. 온라인에서 한 번 실행한 뒤 앱 UI와 저장된 프로젝트를 오프라인으로 다시 열 수 있습니다. 캐시는 자체 HTML/CSS/JS/아이콘만 포함하며 지도 SDK·타일·검색 응답을 캐시하지 않습니다. 지도 없이 좌표 기반 편집·백업이 가능하고 온라인 복귀 후 지도를 다시 연결할 수 있습니다.
 
 새 버전이 준비되면 **더 보기 → 업데이트 적용**을 사용합니다. 적용 전에 저장을 완료합니다. 오프라인 캐시는 빌드 파일 해시로 구분합니다.
 
 ## 배포
 
-저장소의 `.github/workflows/pages.yml`은 main push 때 단위 테스트 → 빌드 → Chromium/WebKit E2E → Pages 배포를 수행합니다. PR은 검증만 수행합니다. 테스트가 실패하면 배포하지 않습니다. 보고서와 빌드 파일은 Actions artifact로 보관합니다.
+저장소의 `.github/workflows/pages.yml`은 main push 때 단위 테스트 → 편집기/비공개 접근 E2E → 공개 백업 전용 빌드/검사/E2E → Pages 배포를 수행합니다. Pages에는 편집기를 배포하지 않습니다. 비공개 앱은 `.openai/hosting.json`으로 식별되는 Sites 소유자 전용 정책을 유지하며 별도로 배포합니다. `npm run build:private`에는 `VITE_NAVER_MAP_CLIENT_ID`를 지정하세요. PR은 검증만 수행합니다. 테스트가 실패하면 배포하지 않습니다. 보고서와 빌드 파일은 Actions artifact로 보관합니다.
 
 최초 한 번 저장소 **Settings → Pages → Build and deployment → Source: GitHub Actions**를 선택하세요. 이후 main에 반영하면 자동 배포됩니다. 환경 변수 변경 후 Actions를 수동 실행해도 됩니다. 저장 데이터의 자동 이전을 위해 기존 도메인을 유지하는 것이 좋습니다.
 

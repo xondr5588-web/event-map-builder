@@ -26,6 +26,12 @@ jobs:
           VITE_NAVER_MAP_CLIENT_ID: test-client
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
+      - run: npm run build:private
+        env:
+          VITE_NAVER_MAP_CLIENT_ID: test-client
+      - run: npm run test:access
+        env:
+          FIELD_ACCESS_TEST_MODE: private
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,6 +40,7 @@ jobs:
           retention-days: 14
       - run: npm run build:pages
       - run: node scripts/verify-public-build.mjs
+      - run: npm run test:access
       - uses: actions/upload-artifact@v4
         with:
           name: public-recovery-build

@@ -27,10 +27,9 @@ try {
     ...(await recoverJournals(repository, localStorage)),
   ];
   const all = await repository.list(true);
-  document.getElementById("storage-status").textContent =
-    all.length
-      ? `이 브라우저에 프로젝트 ${all.length}개가 있습니다. 휴지통·저장 버전도 함께 백업합니다.`
-      : "이 브라우저에 저장된 프로젝트가 없습니다. 작업했던 기기와 브라우저에서 다시 열어주세요.";
+  document.getElementById("storage-status").textContent = all.length
+    ? `이 브라우저에 프로젝트 ${all.length}개가 있습니다. 휴지통·저장 버전도 함께 백업합니다.`
+    : "이 브라우저에 저장된 프로젝트가 없습니다. 작업했던 기기와 브라우저에서 다시 열어주세요.";
   document.getElementById("backup").disabled = false;
   if (notices.length)
     document.getElementById("backup-status").textContent = notices.join(" ");
@@ -52,8 +51,12 @@ document.getElementById("backup").onclick = async () => {
       if (/^(event_map_.*_(autosave|versions)|emb:recovery:)/.test(key))
         backup.recoveryOriginals[key] = localStorage.getItem(key);
     }
-    download(JSON.stringify(backup, null, 2), `FIELD-이전작업-전체백업-${new Date().toISOString().slice(0, 10)}.json`);
-    status.textContent = "백업 파일을 준비했습니다. 다운로드를 확인한 뒤 전용 사이트에서 가져오세요.";
+    download(
+      JSON.stringify(backup, null, 2),
+      `FIELD-이전작업-전체백업-${new Date().toISOString().slice(0, 10)}.json`,
+    );
+    status.textContent =
+      "백업 파일을 준비했습니다. 다운로드를 확인한 뒤 전용 사이트에서 가져오세요.";
   } catch (error) {
     status.textContent = `백업 실패: ${error.message}. 원본 데이터는 그대로 유지됩니다.`;
   } finally {
@@ -61,5 +64,7 @@ document.getElementById("backup").onclick = async () => {
   }
 };
 if ("serviceWorker" in navigator)
-  navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" })
-    .then((registration) => registration.update()).catch(() => {});
+  navigator.serviceWorker
+    .register("./sw.js", { scope: "./", updateViaCache: "none" })
+    .then((registration) => registration.update())
+    .catch(() => {});

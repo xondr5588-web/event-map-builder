@@ -1,7 +1,7 @@
 import { clone } from "./model.js";
 import { clamp, world, unworld, validCoord } from "./geometry.js";
-export const MAP_CLIENT_ID =
-  import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "";
+import { verifyPrivateAccess } from "./access.js";
+export const MAP_CLIENT_ID = import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "";
 export const PLACE_URL = import.meta.env?.VITE_PLACE_SEARCH_URL || "";
 let reloadSDK = false;
 export class MapAdapter {
@@ -51,7 +51,10 @@ export class MapAdapter {
       return;
     }
     if (!MAP_CLIENT_ID) {
-      this.onStatus("offline", "지도 연결 설정이 없습니다. 비공개 작업 공간을 이용하세요.");
+      this.onStatus(
+        "offline",
+        "지도 연결 설정이 없습니다. 비공개 작업 공간을 이용하세요.",
+      );
       return;
     }
     if (!navigator.onLine) {
@@ -59,6 +62,7 @@ export class MapAdapter {
       return;
     }
     try {
+      await verifyPrivateAccess();
       await this.loadSDK();
       if (this.destroyed) return;
       const n = window.naver.maps;

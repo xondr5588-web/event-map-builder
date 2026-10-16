@@ -1666,3 +1666,56 @@ kbd {
 .has-objects #offline-grid > span {
   display: none;
 }
+/* Private hosting: authentication screens never expose the editor. */
+#app[hidden] {
+  display: none !important;
+}
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: #f3f5f1;
+  padding: 24px;
+  color: #203d38;
+}
+.auth-screen > div {
+  width: min(100%, 480px);
+  padding: 32px;
+  border-radius: 20px;
+  background: white;
+  border: 1px solid #dae5dd;
+}
+.auth-screen h1 {
+  font-size: 24px;
+  line-height: 1.5;
+  margin: 24px 0 12px;
+}
+.auth-screen p {
+  color: #687970;
+  line-height: 1.8;
+  font-size: 14px;
+}
+.auth-screen a,
+.auth-screen button,
+.private-logout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #1c6256;
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.auth-screen button {
+  width: 100%;
+  background: white;
+  color: #1c6256;
+  border: 1px solid #b9cec2;
+}

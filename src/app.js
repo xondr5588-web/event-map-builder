@@ -1,4 +1,5 @@
 import "./styles.css";
+import { PRIVATE_MODE, verifyPrivateAccess } from "./access.js";
 import { CATALOG, TYPE_LABELS, kindInfo } from "./catalog.js";
 import {
   clone,
@@ -571,6 +572,20 @@ function more() {
     "프로젝트 도구",
     `<div class="menu-grid">${button("import", "JSON 가져오기", "upload")}${button("export", "JSON 내보내기", "download")}${button("backup", "전체 프로젝트 백업", "folder")}${button("share", "프로젝트 파일 공유", "share")}${button("save", "현재 버전 저장", "save")}${button("versions", "이전 버전 복구", "history")}${button("print", "인쇄 / PDF", "print")}${button("png", "운영요소 PNG", "marker")}${button("settings", "지도 · 저장 설정", "settings")}${button("help", "사용법 · 단축키", "info")}${button("install", "홈 화면 설치", "plus")}${swRegistration?.waiting ? button("update-app", "업데이트 적용", "check") : ""}</div>`,
   );
+  if (PRIVATE_MODE) {
+    const logout = document.createElement("a");
+    logout.href = "/signout-with-chatgpt?return_to=%2F";
+    logout.target = "_top";
+    logout.className = "private-logout";
+    logout.textContent = "소유자 전용 · 로그아웃";
+    logout.onclick = async (event) => {
+      event.preventDefault();
+      if (!(await flush())) return;
+      map?.destroy();
+      window.location.assign(logout.href);
+    };
+    $("modal-body").append(logout);
+  }
 }
 function settings() {
   modal(
@@ -1399,4 +1414,36 @@ async function boot() {
     }
   }
 }
-await boot();
+function showAccessGate() {
+  $("app").hidden = true;
+  document.querySelector(".auth-screen")?.remove();
+  const screen = document.createElement("main");
+  screen.className = "auth-screen";
+  screen.innerHTML =
+    '<div><b>FIELD · 비공개 작업 공간</b><h1>소유자 로그인이 필요합니다.</h1><p>네트워크와 로그인 상태를 확인한 후 다시 연결하세요.<br/>저장된 프로젝트는 이 브라우저에 유지됩니다.</p><a href="/signin-with-chatgpt?return_to=%2F" target="_top">ChatGPT 계정으로 로그인</a><button id="access-retry">다시 확인</button></div>';
+  document.body.append(screen);
+  document.getElementById("access-retry").onclick = () =>
+    window.location.reload();
+}
+if (PRIVATE_MODE) $("app").hidden = true;
+try {
+  await verifyPrivateAccess();
+  $("app").hidden = false;
+  await boot();
+  if (PRIVATE_MODE) {
+    $("connection-label").textContent = "소유자 전용 작업 공간";
+    document.addEventListener("visibilitychange", async () => {
+      if (document.hidden) return;
+      try {
+        await verifyPrivateAccess();
+      } catch {
+        await flush();
+        map?.destroy();
+        showAccessGate();
+      }
+    });
+  }
+} catch (error) {
+  if (PRIVATE_MODE) showAccessGate();
+  else throw error;
+}
