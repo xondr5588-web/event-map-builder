@@ -48,7 +48,7 @@ test("authorized local work survives session expiry and reauthentication", async
   allowed = true;
   await page.reload();
   await expect(page.locator("#project-title")).toHaveText("로그인 복구 검증");
-  await page.getByRole("button", { name: "더 보기", exact: true }).click();
+  await page.locator('[data-action="more"]:visible').first().click();
   await expect(
     page.getByRole("link", { name: "소유자 전용 · 로그아웃" }),
   ).toBeVisible();
