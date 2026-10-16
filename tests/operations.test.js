@@ -160,3 +160,54 @@ test("automatic annotations remain bounded across zoom, large preferences and co
     false,
   );
 });
+
+test("manual marker sizes bypass automatic caps, stay fixed across zoom and leave lines and labels alone", () => {
+  const p = newProject(),
+    marker = newObject("marker", "police", [point]);
+  const line = newObject("line", "vehicle", [
+    point,
+    { lat: 35.201, lng: 128.201 },
+  ]);
+  const oldLine = elementScale(p, line, 17),
+    oldLabel = labelScale(p, marker, 17);
+  p.settings.markerSize = 72;
+  for (const zoom of [6, 17, 21])
+    assert.equal(
+      elementScale(p, marker, zoom, { width: 320, height: 568 }),
+      72 / 50,
+    );
+  assert.equal(elementScale(p, line, 17), oldLine);
+  assert.equal(labelScale(p, marker, 17), oldLabel);
+  marker.style.markerSize = 20;
+  assert.equal(elementScale(p, marker, 17), 0.4);
+  p.settings.markerSize = 96;
+  assert.equal(elementScale(p, marker, 21), 0.4);
+  marker.style.markerSize = null;
+  assert.equal(elementScale(p, marker, 21), 96 / 50);
+  p.settings.markerSize = null;
+  assert.ok(elementScale(p, marker, 21) < 1);
+});
+test("manual sizes migrate safely, persist in JSON and undo independently of assignments and coordinates", () => {
+  const p = newProject();
+  p.objects = [newObject("marker", "fire", [point])];
+  p.objects[0].operations.team = "소방 A팀";
+  const original = clone(p),
+    h = new History();
+  p.settings.markerSize = 24;
+  p.objects[0].style.markerSize = 48;
+  h.record(original, p, "sizes");
+  assert.deepEqual(parseImport(exportProject(p)).projects[0], p);
+  assert.deepEqual(h.undo(p), original);
+  assert.deepEqual(h.redo(original), p);
+  p.settings.markerSize = 999;
+  p.objects[0].style.markerSize = -2;
+  const clean = migrate(p).project;
+  assert.equal(clean.settings.markerSize, 96);
+  assert.equal(clean.objects[0].style.markerSize, 16);
+  assert.deepEqual(clean.objects[0].position, point);
+  assert.equal(clean.objects[0].operations.team, "소방 A팀");
+  delete p.settings.markerSize;
+  delete p.objects[0].style.markerSize;
+  assert.equal(migrate(p).project.settings.markerSize, null);
+  assert.equal(migrate(p).project.objects[0].style.markerSize, null);
+});

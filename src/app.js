@@ -25,6 +25,7 @@ import { Editor } from "./editor.js";
 import { PrintView } from "./print.js";
 import { icon } from "./icons.js";
 import { markerSymbol } from "./symbols.js";
+import { MarkerSizeControl } from "./marker-size.js";
 import {
   planningHTML,
   summaryHTML,
@@ -62,6 +63,7 @@ let project = newProject(),
   map,
   renderer,
   editor,
+  sizeControl,
   printer;
 let panel = "tools",
   multi = false,
@@ -267,6 +269,7 @@ function refresh(panelToo = true) {
   for (const id of editor?.selection || [])
     if (!project.objects.some((o) => o.id === id)) editor.selection.delete(id);
   editor?.request();
+  sizeControl?.sync();
   renderCommand();
   renderInspector();
   if (panelToo || panel === "objects") renderPanel();
@@ -285,11 +288,13 @@ function viewChanged() {
 }
 function changedMap() {
   editor?.request();
+  sizeControl?.sync();
   $("zoom-level").textContent = map.view.zoom;
   $("coordinates").textContent =
     `${map.view.center.lat.toFixed(6)}, ${map.view.center.lng.toFixed(6)}`;
 }
 function showPanel(name) {
+  sizeControl?.close();
   panel = name;
   $("panel").classList.add("open");
   renderPanel();
@@ -411,7 +416,7 @@ function inspectorHTML() {
     return `<div class="empty-state">지도에서 객체를 선택해 주세요.</div>`;
   const many = objects.length > 1,
     locked = objects.every((o) => o.locked);
-  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div><div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>${operationsFields(objects, project)}`;
+  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div>${objects.some((x) => x.type === "marker") ? `<div class="inspector-size">${button("selected-marker-size", "마커 크기 조절", "size")}</div>` : ""}<div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}${objects.some((x) => x.type !== "marker") ? `<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${operationsFields(objects, project)}`;
 }
 function renderInspector() {
   if (!editor) return;
@@ -419,6 +424,7 @@ function renderInspector() {
     editor.selection.size > 0 &&
     !editor.tool &&
     !editor.editing &&
+    $("marker-size-panel").hidden &&
     !printer?.active;
   $("inspector").hidden = !show;
   if (show) $("inspector").innerHTML = inspectorHTML();
@@ -448,7 +454,7 @@ function renderCommand() {
   } else if (editor.editing) {
     text = `<div class="command-title">${icon("edit", 17)}<b>위치 편집</b><small>점·객체·라벨 드래그</small></div><div class="command-actions">${button("cancel", "편집 종료")}${editor.vertex >= 0 ? button("delete-vertex", `${editor.vertex + 1}번 점 삭제`) : ""}${button("finish", "완료", "check", "primary")}</div><div class="command-hint">작은 +를 눌러 점 추가 · 점을 선택하면 삭제할 수 있습니다.</div>`;
   } else if (mobile() && editor.selection.size) {
-    text = `<div class="command-title"><b>${editor.selection.size === 1 ? esc(selectedObjects()[0]?.name || "객체") : editor.selection.size + "개 선택"}</b>${button("deselect", "", "close")}</div><div class="command-actions">${button("properties", "속성", "settings")}${editor.selection.size === 1 ? button("edit", "위치 편집", "edit") : button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash")}</div>`;
+    text = `<div class="command-title"><b>${editor.selection.size === 1 ? esc(selectedObjects()[0]?.name || "객체") : editor.selection.size + "개 선택"}</b>${button("deselect", "", "close")}</div><div class="command-actions">${button("properties", "속성", "settings")}${selectedObjects().some((o) => o.type === "marker") ? button("selected-marker-size", "크기", "size") : ""}${editor.selection.size === 1 ? button("edit", "위치 편집", "edit") : button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash")}</div>`;
   }
   bar.hidden = !text;
   bar.innerHTML = text;
@@ -461,6 +467,7 @@ function renderCommand() {
   } else if (!editor.tool) cross?.remove();
 }
 function useTool(type, kind) {
+  sizeControl?.close();
   currentToolName = $("tool-name")?.value.trim() ?? currentToolName;
   editor.setMode("draw", { type, kind });
   editor.selection.clear();
@@ -477,6 +484,7 @@ function useTool(type, kind) {
   if (!mobile()) renderPanel();
 }
 function onSelection() {
+  sizeControl?.sync();
   renderInspector();
   renderCommand();
   if (panel === "objects") renderPanel();
@@ -615,7 +623,7 @@ function settings() {
     .querySelector(".stack")
     .insertAdjacentHTML(
       "afterbegin",
-      `<div class="scale-settings"><b>지도 축척과 요소 크기</b><label class="check-label"><input type="checkbox" data-setting="autoSize" ${project.settings.autoSize ? "checked" : ""}/>마커·라벨 자동 크기 조절 (권장)</label><p class="small muted">확대해도 마커와 글자가 지도를 가리지 않도록 화면에 맞춰 크기를 제한합니다. 터치 선택 영역은 작아지지 않습니다.</p><label>전체 요소 크기 (%)<input type="number" data-view-setting="symbolSize" min="25" max="300" value="${Math.round(project.settings.symbolSize * 100)}"/></label><details><summary>고급 축척 설정</summary><label class="check-label"><input type="checkbox" data-setting="scaleWithMap" ${project.settings.scaleWithMap ? "checked" : ""}/>지도 확대·축소에 따라 크기 조절</label><button data-action="reference-zoom">현재 지도 확대 수준을 기준으로</button><p class="small muted">기준 확대 ${project.settings.referenceZoom} · 자동 크기를 끄면 기존 지도 비례 크기를 사용합니다. 구역의 실제 좌표와 동선 간격은 유지됩니다.</p></details></div>`,
+      `<div class="scale-settings"><b>지도 축척과 요소 크기</b><p class="small muted">마커 크기는 지도 도구줄의 <b>크기</b> 버튼에서 바로 조절하세요. 수동 지정한 크기가 우선 적용됩니다.</p><label class="check-label"><input type="checkbox" data-setting="autoSize" ${project.settings.autoSize ? "checked" : ""}/>마커·라벨 자동 크기 조절 (권장)</label><p class="small muted">확대해도 마커와 글자가 지도를 가리지 않도록 화면에 맞춰 크기를 제한합니다. 터치 선택 영역은 작아지지 않습니다.</p><label>자동·비례 표시 배율 (%)<input type="number" data-view-setting="symbolSize" min="25" max="300" value="${Math.round(project.settings.symbolSize * 100)}"/></label><details><summary>고급 축척 설정</summary><label class="check-label"><input type="checkbox" data-setting="scaleWithMap" ${project.settings.scaleWithMap ? "checked" : ""}/>지도 확대·축소에 따라 크기 조절</label><button data-action="reference-zoom">현재 지도 확대 수준을 기준으로</button><p class="small muted">기준 확대 ${project.settings.referenceZoom} · 자동 크기를 끄면 기존 지도 비례 크기를 사용합니다. 구역의 실제 좌표와 동선 간격은 유지됩니다.</p></details></div>`,
     );
 }
 function help() {
@@ -663,6 +671,19 @@ async function install() {
   );
 }
 const actions = {
+  "marker-size": () => {
+    if (!$("marker-size-panel").hidden) sizeControl.close();
+    else {
+      closePanel();
+      sizeControl.open();
+      renderInspector();
+    }
+  },
+  "selected-marker-size": () => {
+    closePanel();
+    sizeControl.open("selected");
+    renderInspector();
+  },
   plan: () => {
     $("modal").close();
     showPanel("plan");
@@ -966,11 +987,21 @@ document.addEventListener(
     const b = e.target.closest("button");
     if (!b || b.disabled) return;
     if (b.dataset.action) {
+      if (
+        ![
+          "marker-size",
+          "selected-marker-size",
+          "zoom-in",
+          "zoom-out",
+        ].includes(b.dataset.action)
+      )
+        sizeControl?.close();
       e.preventDefault();
       if (actions[b.dataset.action]) await actions[b.dataset.action]();
       return;
     }
     if (b.dataset.panel) {
+      sizeControl?.close();
       if (
         panel === b.dataset.panel &&
         $("panel").classList.contains("open") &&
@@ -1450,6 +1481,15 @@ async function boot() {
     },
   });
   printer = new PrintView(map, editor, () => project);
+  sizeControl = new MarkerSizeControl($("marker-size-panel"), {
+    project: () => project,
+    selection: selectedObjects,
+    map,
+    renderer,
+    mutate,
+    request: () => editor.request(),
+    closed: () => renderInspector(),
+  });
   refresh();
   status(readOnly ? "저장소 연결 실패" : "자동저장 준비됨", readOnly);
   changedMap();

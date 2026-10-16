@@ -216,7 +216,7 @@ test("marker, label and line size follow zoom while touch targets retain minimum
     "8",
   );
 });
-test("booth, guard and police symbols render in map, export and saved data", async ({
+test("consistent booth, personnel, police, fire and facility symbols render in map, print and PNG", async ({
   page,
 }, info) => {
   await choose(page, "police");
@@ -232,7 +232,15 @@ test("booth, guard and police symbols render in map, export and saved data", asy
   await place(page, "shuttle", 0.7, 0.35);
   await place(page, "booth", 0.3, 0.35);
   await place(page, "safetyStaff", 0.5, 0.35);
-  await expect(page.locator(".map-object.marker")).toHaveCount(4);
+  await place(page, "fire", 0.3, 0.2);
+  await place(page, "medical", 0.7, 0.2);
+  await expect(page.locator(".map-object.marker")).toHaveCount(6);
+  await expect(
+    page.locator('.map-object.marker [data-symbol="fire-emblem"] path'),
+  ).toHaveCount(75);
+  await expect(
+    page.locator('.map-object.marker [data-symbol="medical-station"]'),
+  ).toBeVisible();
   await expect(
     page.locator('.map-object.marker [data-symbol="event-booth"]'),
   ).toBeVisible();
@@ -240,13 +248,19 @@ test("booth, guard and police symbols render in map, export and saved data", asy
     page.locator('.map-object.marker [data-symbol="security-guard"]'),
   ).toBeVisible();
   await expect(
-    page.locator(".map-object.marker text").filter({ hasText: "BUS" }),
+    page.locator('.map-object.marker [data-symbol="shuttle-stop"]'),
   ).toHaveCount(1);
   await page.locator(".header-actions [data-action=print]").click();
   await expect(
     page.locator('#print-legend [data-symbol="police-emblem"]'),
   ).toHaveCount(1);
   await expect(page.locator("#print-legend")).toContainText("경찰부스");
+  await expect(
+    page.locator('#print-legend [data-symbol="fire-emblem"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('#print-legend [data-symbol="medical-station"]'),
+  ).toBeVisible();
   await expect(
     page.locator('#print-legend [data-symbol="event-booth"]'),
   ).toBeVisible();
@@ -347,4 +361,132 @@ test("pre-update project at zoom 17 receives compact automatic sizing without lo
   expect(restored.objects[0].name).toBe(oldMarker.name);
   expect(restored.objects[0].label.text).toBe(oldMarker.label.text);
   expect(restored.objects[0].operations).toEqual(oldMarker.operations);
+});
+
+test("manual size controls preview live, commit one drag, isolate selection and survive reload and export", async ({
+  page,
+}, info) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const p = newProject("마커 크기 현장"),
+    c = p.view.center;
+  const a = newObject("marker", "police", [{ lat: c.lat, lng: c.lng - 0.001 }]);
+  const b = newObject("marker", "fire", [{ lat: c.lat, lng: c.lng + 0.001 }]);
+  const route = newObject("line", "vehicle", [
+    { lat: c.lat - 0.002, lng: c.lng - 0.001 },
+    { lat: c.lat - 0.002, lng: c.lng + 0.001 },
+  ]);
+  p.objects = [a, b, route];
+  await page.locator("#import-file").setInputFiles({
+    name: "size-project.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(p)),
+  });
+  await page.locator('[data-action="confirm-dialog"]').click();
+  await expect(page.locator("#toast")).toContainText("가져오기");
+  await close(page);
+  const shape = page.locator(`[data-object="${a.id}"]`),
+    other = page.locator(`[data-object="${b.id}"]`);
+  const lineWidth = await page
+    .locator(".map-object.line .object-shape")
+    .getAttribute("stroke-width");
+  await page
+    .getByRole("button", { name: "마커 크기 조절", exact: true })
+    .click();
+  const control = page.locator("#marker-size-panel");
+  await control.locator('[data-size-preset="24"]').click();
+  await expect(shape).toHaveAttribute("data-render-scale", "0.48");
+  await expect(other).toHaveAttribute("data-render-scale", "0.48");
+  // Drag with actual pointer input. The project must not commit until release.
+  const slider = control.locator("#marker-size-slider"),
+    box = await slider.boundingBox();
+  let touch;
+  if (info.project.name === "galaxy") {
+    touch = await page.context().newCDPSession(page);
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: box.x + box.width * 0.15, y: box.y + box.height / 2 }],
+    });
+    for (let i = 1; i <= 8; i++)
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [
+          {
+            x: box.x + box.width * (0.15 + (0.63 * i) / 8),
+            y: box.y + box.height / 2,
+          },
+        ],
+      });
+  } else {
+    await page.mouse.move(box.x + box.width * 0.15, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.78, box.y + box.height / 2, {
+      steps: 8,
+    });
+  }
+  await expect
+    .poll(async () => Number(await shape.getAttribute("data-render-scale")))
+    .toBeGreaterThan(1);
+  const previewScale = Number(await shape.getAttribute("data-render-scale"));
+  if (touch) {
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await touch.detach();
+  } else await page.mouse.up();
+  await expect(page.locator("#save-status")).toContainText("완료");
+  await page.locator('[data-action="undo"]').click();
+  await expect(shape).toHaveAttribute("data-render-scale", "0.48");
+  await page.locator('[data-action="redo"]').click();
+  await expect
+    .poll(async () => Number(await shape.getAttribute("data-render-scale")))
+    .toBe(previewScale);
+  await page
+    .getByRole("button", { name: "마커 크기 조절", exact: true })
+    .click();
+  await control.locator('[data-size-preset="24"]').click();
+  await control.locator("[data-size-close]").click();
+  await shape.locator(".object-hit").click();
+  await page
+    .locator(
+      mobile(page)
+        ? '#command-bar [data-action="selected-marker-size"]'
+        : '#inspector [data-action="selected-marker-size"]',
+    )
+    .click();
+  await expect(control.locator('[data-size-scope="selected"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await control.locator('[data-size-preset="48"]').click();
+  await expect(shape).toHaveAttribute("data-render-scale", "0.96");
+  await expect(other).toHaveAttribute("data-render-scale", "0.48");
+  await info.attach("manual-size-selection", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await control.locator("[data-size-close]").click();
+  await page.locator('[data-action="zoom-in"]').click();
+  await expect(shape).toHaveAttribute("data-render-scale", "0.96");
+  await page.locator('[data-action="zoom-out"]').click();
+  await expect(page.locator(".map-object.line .object-shape")).toHaveAttribute(
+    "stroke-width",
+    lineWidth,
+  );
+  await expect(page.locator("#save-status")).toContainText("완료");
+  await page.reload();
+  await expect(shape).toHaveAttribute("data-render-scale", "0.96");
+  await expect(other).toHaveAttribute("data-render-scale", "0.48");
+  const pending = page.waitForEvent("download");
+  await page.locator('.header-actions [data-action="more"]').click();
+  await page.locator('#modal [data-action="export"]').click();
+  let json = "";
+  for await (const chunk of await (await pending).createReadStream())
+    json += chunk;
+  const data = JSON.parse(json).project;
+  expect(data.settings.markerSize).toBe(24);
+  expect(data.objects.find((o) => o.id === a.id).style.markerSize).toBe(48);
+  expect(data.objects.find((o) => o.id === a.id).position).toEqual(a.position);
+  expect(errors).toEqual([]);
 });

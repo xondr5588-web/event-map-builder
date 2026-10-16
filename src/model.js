@@ -76,6 +76,7 @@ export function newProject(title = "새 행사 운영도") {
       scaleWithMap: true,
       referenceZoom: 16,
       symbolSize: 1,
+      markerSize: null,
     },
     meta: { note: "", plan: defaultPlan() },
   };
@@ -100,6 +101,7 @@ export function newObject(type, kind, points, name) {
       opacity: type === "area" ? 0.2 : 1,
       spacing: kind === "cone" ? 7 : 40,
       scale: 1,
+      markerSize: null,
     },
     operations: {
       quantity: 1,
@@ -188,6 +190,10 @@ function normalizeObject(raw, type, index, ids, warnings, legacyLayer = {}) {
       500,
     ),
     scale: number(st.scale, 1, 0.25, 4),
+    markerSize:
+      st.markerSize == null || st.markerSize === ""
+        ? null
+        : number(st.markerSize, 32, 16, 96),
   };
   const op = raw.operations || {};
   o.operations = {
@@ -289,6 +295,10 @@ export function migrate(input) {
   // Anchor pre-upgrade screen offsets and symbol sizes at their saved zoom.
   p.settings.referenceZoom = number(s.referenceZoom, p.view.zoom, 6, 21);
   p.settings.symbolSize = number(s.symbolSize, 1, 0.25, 3);
+  p.settings.markerSize =
+    s.markerSize == null || s.markerSize === ""
+      ? null
+      : number(s.markerSize, 32, 16, 96);
   let entries;
   if (modern) entries = raw.objects;
   else if (old) {

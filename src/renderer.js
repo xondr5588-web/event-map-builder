@@ -96,6 +96,23 @@ export class Renderer {
     draft = null,
     vertex = -1,
   ) {
+    // Slider previews never enter the project, persistence journal or undo history.
+    const preview = this.markerSizePreview;
+    if (preview)
+      project =
+        preview.scope === "all"
+          ? {
+              ...project,
+              settings: { ...project.settings, markerSize: preview.value },
+            }
+          : {
+              ...project,
+              objects: project.objects.map((o) =>
+                preview.ids.has(o.id)
+                  ? { ...o, style: { ...o.style, markerSize: preview.value } }
+                  : o,
+              ),
+            };
     const { width, height } = this.map.size;
     attr(this.svg, "viewBox", `0 0 ${width} ${height}`);
     const patternScale = elementScale(
@@ -239,7 +256,7 @@ export class Renderer {
       let x = anchor.x + o.label.dx * textScale,
         y = anchor.y + o.label.dy * textScale;
       if (!o.label.manual && !o.label.position) {
-        if (o.type === "marker" && project.settings.autoSize !== false)
+        if (o.type === "marker")
           y = Math.max(y, anchor.y + 26 * scale + 13 * textScale + 6);
         const key = `${Math.round(x / (130 * textScale))}:${Math.round(y / (32 * textScale))}`,
           count = buckets.get(key) || 0;

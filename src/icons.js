@@ -1,4 +1,5 @@
 const paths = {
+  size: "M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5M8 12h8m-6-2-2 2 2 2m4-4 2 2-2 2",
   map: "M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2V5zm6-2v16m6-14v16",
   area: "M4 4h16v16H4z",
   line: "M4 18l5-10 6 6 5-10",
