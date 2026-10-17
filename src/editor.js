@@ -32,6 +32,22 @@ export class Editor {
       if (this.drag && !this.pointers.size) this.cancelGesture();
     });
     svg.addEventListener("contextmenu", (e) => e.preventDefault());
+    svg.addEventListener("keydown", (e) => {
+      const label = e.target.closest?.(".map-object.marker .object-label");
+      if (
+        label &&
+        !this.editing &&
+        !this.tool &&
+        this.mode === "select" &&
+        ["Enter", " "].includes(e.key)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = label.closest("[data-object]").dataset.object;
+        this.select(id);
+        this.cb.rename?.(id);
+      }
+    });
     svg.addEventListener(
       "wheel",
       (e) => {
@@ -59,6 +75,7 @@ export class Editor {
           : null,
         this.vertex,
       );
+      this.cb.rendered?.();
     });
   }
   xy(e) {
@@ -123,6 +140,10 @@ export class Editor {
   }
   down(e) {
     if (e.button && e.button !== 0) return;
+    if (this.cb.beforePointer?.() === false) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     this.svg.focus({ preventScroll: true });
     const p = this.xy(e);
@@ -148,8 +169,20 @@ export class Editor {
       id = target?.dataset.object,
       handle = e.target.closest("[data-handle]")?.dataset.handle,
       index = Number(e.target.closest("[data-index]")?.dataset.index);
-    const o = this.project.objects.find((o) => o.id === id),
-      editable = this.editing && this.selection.has(id) && !o?.locked;
+    const o = this.project.objects.find((o) => o.id === id);
+    const quickMarker =
+      o?.type === "marker" &&
+      !this.tool &&
+      !this.editing &&
+      this.mode === "select" &&
+      !e.shiftKey &&
+      !this.cb.multi();
+    if (quickMarker && (this.selection.size !== 1 || !this.selection.has(id)))
+      this.select(id);
+    if (quickMarker) this.request();
+    const directMove = quickMarker && !o.locked && handle !== "label";
+    const editable =
+      (this.editing && this.selection.has(id) && !o?.locked) || directMove;
     const label =
         editable && handle === "label"
           ? target?.querySelector(".object-label")
@@ -169,8 +202,10 @@ export class Editor {
       index,
       moved: false,
       editable,
+      quickMarker,
+      directMove,
       shift: e.shiftKey,
-      before: editable ? clone(this.project) : null,
+      before: editable && !directMove ? clone(this.project) : null,
       startCoord: this.map.unproject(p),
       original: editable ? clone(o) : null,
       labelOffset: labelAnchor
@@ -180,7 +215,7 @@ export class Editor {
           }
         : null,
     };
-    if (editable) this.preview = clone(this.cb.project());
+    if (editable && !directMove) this.preview = clone(this.cb.project());
     if (e.pointerType !== "mouse" && id && !this.tool) {
       this.longTimer = setTimeout(() => {
         if (this.drag && !this.drag.moved) {
@@ -227,6 +262,11 @@ export class Editor {
     }
     if (!d.moved) return;
     if (d.editable) {
+      // A tap only selects. Allocate a preview and history snapshot when a drag starts.
+      if (!this.preview) {
+        d.before = clone(this.cb.project());
+        this.preview = clone(this.cb.project());
+      }
       const o = this.project.objects.find((o) => o.id === d.id);
       if (!o) return;
       if (d.handle === "label") {
@@ -326,6 +366,10 @@ export class Editor {
       return;
     }
     if (this.mode === "pan") return;
+    if (d.quickMarker) {
+      if (d.handle === "label") this.cb.rename?.(d.id);
+      return;
+    }
     if (d.id) {
       this.select(d.id, d.shift || this.cb.multi());
     } else if (!this.editing) this.select(null);

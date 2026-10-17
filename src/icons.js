@@ -45,6 +45,7 @@ const paths = {
   copy: "M8 8h13v13H8zM16 8V3H3v13h5",
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
   lock: "M7 10V7a5 5 0 0110 0v3M5 10h14v11H5z",
+  unlock: "M7 10V7a5 5 0 019-3M5 10h14v11H5z",
   eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm7 0a3 3 0 106 0 3 3 0 10-6 0",
   hidden: "m3 3 18 18M9 5c7-2 13 7 13 7l-3 4M6 7l-4 5s6 9 14 6",
   edit: "m3 17 13-13 4 4L7 21H3v-4zm10-10 4 4",

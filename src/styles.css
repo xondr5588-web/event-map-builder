@@ -2309,3 +2309,91 @@ kbd {
     display: none;
   }
 }
+
+/* Direct marker editing keeps small, touchable actions beside the selection. */
+.map-object.marker:not(.locked) .object-hit {
+  cursor: grab;
+}
+.map-object.marker .object-label {
+  cursor: text;
+}
+.map-object.marker.locked .object-label {
+  cursor: not-allowed;
+}
+#marker-quick-actions {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid #c9dbd1;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+#marker-quick-actions[hidden],
+#marker-name-editor[hidden] {
+  display: none;
+}
+#marker-quick-actions button {
+  min-height: 44px;
+  padding: 7px 11px;
+  border: 0;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+#marker-quick-actions button[aria-pressed="true"] {
+  background: #fff2db;
+  color: #78501c;
+}
+#marker-name-editor {
+  position: absolute;
+  z-index: 16;
+  width: min(340px, calc(100% - 16px));
+  padding: 10px;
+  border: 1px solid #87b1a3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+#marker-name-editor > label {
+  margin: 0 0 5px;
+  font-size: 11px;
+}
+.marker-name-row {
+  display: flex;
+  gap: 5px;
+}
+#marker-name-input {
+  width: 0;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  font-size: 16px;
+  padding: 8px;
+}
+.marker-name-row button {
+  flex: 0 0 44px;
+  min-height: 44px;
+  padding: 7px;
+}
+.marker-name-row button[type="submit"] {
+  background: #17675b;
+  color: white;
+  border-color: #17675b;
+}
+#stage:has(#marker-name-editor:not([hidden])) #command-bar,
+#stage:has(#marker-name-editor:not([hidden])) #inspector {
+  display: none;
+}
+.print-preview #marker-quick-actions,
+.print-preview #marker-name-editor {
+  display: none;
+}
+@media print {
+  #marker-quick-actions,
+  #marker-name-editor {
+    display: none !important;
+  }
+}

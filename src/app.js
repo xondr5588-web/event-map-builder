@@ -26,6 +26,7 @@ import { PrintView } from "./print.js";
 import { icon } from "./icons.js";
 import { markerSymbol } from "./symbols.js";
 import { MarkerSizeControl } from "./marker-size.js";
+import { MarkerQuickEdit } from "./marker-quick-edit.js";
 import {
   planningHTML,
   summaryHTML,
@@ -64,6 +65,7 @@ let project = newProject(),
   renderer,
   editor,
   sizeControl,
+  quickEdit,
   printer;
 let panel = "tools",
   multi = false,
@@ -270,6 +272,7 @@ function refresh(panelToo = true) {
     if (!project.objects.some((o) => o.id === id)) editor.selection.delete(id);
   editor?.request();
   sizeControl?.sync();
+  quickEdit?.sync();
   renderCommand();
   renderInspector();
   if (panelToo || panel === "objects") renderPanel();
@@ -289,6 +292,7 @@ function viewChanged() {
 function changedMap() {
   editor?.request();
   sizeControl?.sync();
+  quickEdit?.sync();
   $("zoom-level").textContent = map.view.zoom;
   $("coordinates").textContent =
     `${map.view.center.lat.toFixed(6)}, ${map.view.center.lng.toFixed(6)}`;
@@ -629,7 +633,7 @@ function settings() {
 function help() {
   modal(
     "FIELD 사용법",
-    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>객체 선택 → 위치 편집</b>에서 마커, 도형, 흰 점, 라벨을 드래그하세요. 작은 +를 누르면 점이 추가됩니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>운영계획</b>에서 행사·문서 정보를 관리하고, 객체 속성의 <b>현장 배치 정보</b>에 팀·인원·시간·업무지시를 입력하세요. 집계·배치표 CSV·운영계획서 PDF로 연결됩니다.</li><li><b>지도 · 저장 설정</b>에서 축척 연동·전체 크기·기준 확대 수준을 바꿀 수 있습니다. 객체 속성에서는 개별 요소 크기를 조정합니다.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
+    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>마커 이름</b>을 눌러 바로 수정하고, <b>마커 그림</b>을 끌어 위치를 옮기세요. 옆의 <b>잠금 / 잠금 해제</b> 버튼으로 배치를 보호합니다. 도형·흰 점·라벨 위치는 <b>객체 선택 → 위치 편집</b>에서 바꿉니다. 작은 +를 누르면 점이 추가됩니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>운영계획</b>에서 행사·문서 정보를 관리하고, 객체 속성의 <b>현장 배치 정보</b>에 팀·인원·시간·업무지시를 입력하세요. 집계·배치표 CSV·운영계획서 PDF로 연결됩니다.</li><li><b>지도 · 저장 설정</b>에서 축척 연동·전체 크기·기준 확대 수준을 바꿀 수 있습니다. 객체 속성에서는 개별 요소 크기를 조정합니다.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
   );
 }
 async function importFile(file) {
@@ -1475,6 +1479,9 @@ async function boot() {
       renderInspector();
     },
     selectionChanged: onSelection,
+    beforePointer: () => quickEdit?.finishName(),
+    rename: (id) => quickEdit?.openName(id),
+    rendered: () => quickEdit?.sync(),
     toolName: () => currentToolName,
     multi: () => multi,
     toast,
@@ -1494,6 +1501,34 @@ async function boot() {
     mutate,
     request: () => editor.request(),
     closed: () => renderInspector(),
+  });
+  quickEdit = new MarkerQuickEdit($("map-shell"), {
+    project: () => editor.project,
+    selection: () => editor.selection,
+    map,
+    svg: $("editor"),
+    mutate,
+    toast,
+    cancelGesture: () => editor.cancelGesture(),
+    request: () => editor.request(),
+    dragging: () => !!editor.drag?.moved,
+    visible: () =>
+      !editor.tool &&
+      !editor.editing &&
+      editor.mode === "select" &&
+      !printer.active &&
+      !$("modal").open &&
+      !document.body.classList.contains("report-mode") &&
+      $("marker-size-panel").hidden &&
+      (!mobile() || !$("panel").classList.contains("open")),
+    prepareName: () => {
+      if (readOnly) {
+        toast("저장소를 사용할 수 없습니다. JSON 백업 후 다시 열어 주세요.");
+        return false;
+      }
+      sizeControl.close();
+      closePanel();
+    },
   });
   refresh();
   status(readOnly ? "저장소 연결 실패" : "자동저장 준비됨", readOnly);

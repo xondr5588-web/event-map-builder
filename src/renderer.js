@@ -152,9 +152,9 @@ export class Renderer {
         attr(e.hit, "cx", pts[0].x);
         attr(e.hit, "cy", pts[0].y);
         attr(e.hit, "r", Math.max(24, 23 * scale));
-        const signature = `${o.kind}:${o.style.color}`;
+        const signature = `${o.kind}:${o.style.color}:${o.locked}`;
         if (e.signature !== signature) {
-          e.shape.innerHTML = `<circle class="marker-halo" r="25" fill="white" stroke="${o.style.color}" stroke-width="2.2"/><g transform="translate(-20,-20)">${markerArtwork(o.kind)}</g>`;
+          e.shape.innerHTML = `<circle class="marker-halo" r="25" fill="white" stroke="${o.style.color}" stroke-width="2.2"/><g transform="translate(-20,-20)">${markerArtwork(o.kind)}</g>${o.locked ? '<g data-locked-indicator="true" transform="translate(18,18)" pointer-events="none"><circle r="8" fill="#23423d" stroke="white" stroke-width="1.5"/><path d="M-3-1v-2a3 3 0 016 0v2m-7 0h8v6h-8z" fill="none" stroke="white" stroke-width="1.4" stroke-linejoin="round"/></g>' : ""}`;
           e.signature = signature;
         }
       } else {
@@ -310,8 +310,13 @@ export class Renderer {
         attr(
           e.labelTouch,
           "pointer-events",
-          selected && editing ? "all" : "none",
+          (selected && editing) || o.type === "marker" ? "all" : "none",
         );
+        if (o.type === "marker") {
+          attr(e.label, "role", "button");
+          attr(e.label, "aria-label", `이름 수정: ${o.label.text || o.name}`);
+          attr(e.label, "tabindex", selected ? "0" : "-1");
+        }
       }
       const objectAnchor = this.map.project(o.position || center(o.path));
       attr(
