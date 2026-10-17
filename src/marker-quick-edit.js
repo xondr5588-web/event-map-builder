@@ -187,6 +187,8 @@ export class MarkerQuickEdit {
     if (this.cb.prepareName() === false) return;
     this.editingId = id;
     this.cancelling = false;
+    this.composing = false;
+    this.originalText = o.label.text || o.name;
     this.form.innerHTML = `<label for="marker-name-input">마커 이름</label><div class="marker-name-row"><input id="marker-name-input" aria-label="마커 이름" value="${esc(o.label.text || o.name)}" maxlength="120" required autocomplete="off" enterkeyhint="done"/><button type="submit" aria-label="이름 저장">${icon("check", 19)}</button><button type="button" data-cancel-name aria-label="이름 수정 취소">${icon("close", 19)}</button></div>`;
     this.form.hidden = false;
     this.actions.hidden = true;
@@ -213,22 +215,26 @@ export class MarkerQuickEdit {
   }
   finishName() {
     if (this.form.hidden) return true;
-    const value = this.form.querySelector("input").value.trim();
+    const raw = this.form.querySelector("input").value;
+    const value = raw.trim();
     if (!value) {
       this.cb.toast("마커 이름을 입력해 주세요.");
       this.form.querySelector("input").focus({ preventScroll: true });
       return false;
     }
     const id = this.editingId;
+    const changed = raw !== this.originalText;
     this.form.hidden = true;
     this.editingId = null;
-    this.cb.mutate("마커 이름 변경", (p) => {
-      const o = p.objects.find((x) => x.id === id && !x.locked);
-      if (o) {
-        o.name = value;
-        o.label.text = value;
-      }
-    });
+    this.composing = false;
+    if (changed)
+      this.cb.mutate("마커 이름 변경", (p) => {
+        const o = p.objects.find((x) => x.id === id && !x.locked);
+        if (o) {
+          o.name = value;
+          o.label.text = value;
+        }
+      });
     this.cb.request();
     this.sync();
     return true;
@@ -237,6 +243,7 @@ export class MarkerQuickEdit {
     this.form.hidden = true;
     this.editingId = null;
     this.cancelling = false;
+    this.composing = false;
     if (focus) {
       this.cb.svg.focus({ preventScroll: true });
       this.sync();

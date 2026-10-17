@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { newProject, newObject } from "../../src/model.js";
 const mobile = (p) =>
   p.viewportSize().width <= 760 ||
   (p.viewportSize().width <= 1000 && p.viewportSize().height <= 520);
@@ -60,7 +61,8 @@ test("tap a marker name to rename, cancel, blur-save, undo and restore after rel
   page.on("pageerror", (e) => errors.push(e.message));
   await create(page);
   const before = await data(page);
-  await label(page).click();
+  if (info.project.name === "galaxy") await label(page).tap();
+  else await label(page).click();
   const input = page.locator("#marker-name-input");
   await expect(input).toBeFocused();
   await input.fill("서측 주차관리원");
@@ -93,7 +95,10 @@ test("tap a marker name to rename, cancel, blur-save, undo and restore after rel
     contentType: "image/png",
   });
   // A map interaction commits the visible name before opening a position preview.
-  await page.locator(".map-object.marker .object-hit").click();
+  const mapBox = await page.locator("#editor").boundingBox();
+  await page
+    .locator("#editor")
+    .click({ position: { x: mapBox.width * 0.75, y: mapBox.height * 0.5 } });
   await expect(page.locator("#marker-name-editor")).toBeHidden();
   await expect(
     page.locator(".map-object.marker .object-label text"),
@@ -172,4 +177,46 @@ test("drag markers directly and use nearby lock/unlock with undo and touch cance
   expect(restored.objects[0].position).toEqual(final.objects[0].position);
   expect(restored.objects[0].locked).toBe(false);
   expect(errors).toEqual([]);
+});
+
+test("opening a custom label preserves its distinct name and Korean composition does not submit early", async ({
+  page,
+}) => {
+  await page.goto("/?map=offline");
+  await expect(page.locator("#save-status")).toContainText("준비됨");
+  const p = newProject("기존 라벨 보존"),
+    o = newObject("marker", "police", [p.view.center], "경찰 협조부스 A");
+  o.label.text = " 서측 대기 ";
+  o.operations.team = "협조기관";
+  p.objects = [o];
+  await page.locator("#import-file").setInputFiles({
+    name: "custom-label.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(p)),
+  });
+  await page.locator('[data-action="confirm-dialog"]').click();
+  await expect(page.locator("#toast")).toContainText("가져오기");
+  if (mobile(page)) await page.locator('[data-action="close-panel"]').click();
+  await label(page).click();
+  await page.locator('[aria-label="이름 저장"]').click();
+  const unchanged = await data(page);
+  expect(unchanged.objects[0].name).toBe(o.name);
+  expect(unchanged.objects[0].label.text).toBe(o.label.text);
+  await expect(
+    page.locator('.map-toolbar [data-action="undo"]'),
+  ).toBeDisabled();
+  await label(page).click();
+  const input = page.locator("#marker-name-input");
+  await input.fill("동측 경찰부스");
+  await input.dispatchEvent("compositionstart");
+  await input.press("Enter");
+  await expect(page.locator("#marker-name-editor")).toBeVisible();
+  await input.dispatchEvent("compositionend");
+  await input.press("Enter");
+  await expect(page.locator("#marker-name-editor")).toBeHidden();
+  const changed = await data(page);
+  expect(changed.objects[0].name).toBe("동측 경찰부스");
+  expect(changed.objects[0].label.text).toBe("동측 경찰부스");
+  expect(changed.objects[0].operations).toEqual(o.operations);
+  expect(changed.objects[0].position).toEqual(o.position);
 });
