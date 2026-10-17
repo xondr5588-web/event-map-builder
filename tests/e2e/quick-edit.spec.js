@@ -153,6 +153,11 @@ test("drag markers directly and use nearby lock/unlock with undo and touch cance
   const locked = await data(page);
   expect(locked.objects[0].position).toEqual(moved.objects[0].position);
   expect(locked.objects[0].locked).toBe(true);
+  await page.locator('.header-actions [data-action="print"]').click();
+  await expect(page.locator("[data-locked-indicator]")).toBeHidden();
+  await page.locator('[data-action="exit-print"]').click();
+  await page.locator(".map-object.marker .object-hit").click();
+  await expect(page.locator("[data-locked-indicator]")).toBeVisible();
   await page.locator('.map-toolbar [data-action="undo"]').click();
   await expect(page.locator(".map-object.marker")).not.toHaveClass(/locked/);
   await page.locator('.map-toolbar [data-action="redo"]').click();

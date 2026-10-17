@@ -5,6 +5,7 @@ import { elementScale } from "./scaling.js";
 export class MarkerQuickEdit {
   constructor(shell, cb) {
     this.shell = shell;
+    this.stage = shell.closest("#stage");
     this.cb = cb;
     this.actions = document.createElement("div");
     this.actions.id = "marker-quick-actions";
@@ -119,6 +120,7 @@ export class MarkerQuickEdit {
   sync() {
     const o = this.marker(),
       allowed = this.cb.visible();
+    this.stage?.classList.toggle("marker-selected", !!o);
     if (
       !this.form.hidden &&
       (!allowed || !o || o.id !== this.editingId || o.locked)
@@ -143,7 +145,7 @@ export class MarkerQuickEdit {
     }
     const q = this.cb.map.project(o.position),
       { width, height } = this.bounds();
-    const stage = this.shell.closest("#stage");
+    const stage = this.stage;
     stage?.classList.toggle("marker-on-right", q.x > width / 2);
     if (q.x < -30 || q.y < -30 || q.x > width + 30 || q.y > height + 30) {
       this.actions.hidden = true;

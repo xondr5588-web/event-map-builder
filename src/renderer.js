@@ -289,8 +289,10 @@ export class Renderer {
           shown += c;
           used += cw;
         }
-        e.labelTitle.textContent = labelText;
-        e.label.children[1].textContent = shown;
+        if (e.labelTitle.textContent !== labelText)
+          e.labelTitle.textContent = labelText;
+        if (e.label.children[1].textContent !== shown)
+          e.label.children[1].textContent = shown;
         const w = Math.max(
           44,
           Array.from(shown).reduce(
@@ -312,10 +314,14 @@ export class Renderer {
           "pointer-events",
           (selected && editing) || o.type === "marker" ? "all" : "none",
         );
-        if (o.type === "marker") {
+        if (o.type === "marker" && selected) {
           attr(e.label, "role", "button");
           attr(e.label, "aria-label", `이름 수정: ${o.label.text || o.name}`);
-          attr(e.label, "tabindex", selected ? "0" : "-1");
+          attr(e.label, "tabindex", "0");
+        } else if (e.label.hasAttribute("role")) {
+          e.label.removeAttribute("role");
+          e.label.removeAttribute("aria-label");
+          e.label.removeAttribute("tabindex");
         }
       }
       const objectAnchor = this.map.project(o.position || center(o.path));
@@ -335,8 +341,12 @@ export class Renderer {
     // Only reorder after object ordering actually changes.
     const order = project.objects.map((o) => o.id).join("|");
     if (this.order !== order) {
-      for (const o of project.objects)
-        this.shapes.append(this.entries.get(o.id).group);
+      let next = this.shapes.firstElementChild;
+      for (const o of project.objects) {
+        const node = this.entries.get(o.id).group;
+        if (node === next) next = next.nextElementSibling;
+        else this.shapes.insertBefore(node, next);
+      }
       this.order = order;
     }
     const edit =
