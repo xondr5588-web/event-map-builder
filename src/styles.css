@@ -2397,3 +2397,30 @@ kbd {
     display: none !important;
   }
 }
+/* Keep selected symbols and labels reachable beside compact-screen panels. */
+#stage:has(#map-notice:not([hidden])) .map-top {
+  z-index: 14;
+}
+@media (min-width: 761px) and (max-width: 1150px) and (min-height: 521px) {
+  #stage:has(.map-object.marker.selected) #inspector,
+  #stage:has(.map-object.marker.selected):has(#map-notice:not([hidden]))
+    #inspector {
+    top: var(--marker-inspector-top, auto);
+    bottom: var(--marker-inspector-bottom, 34px);
+    max-height: var(--marker-inspector-height, 30%);
+  }
+}
+@media (max-height: 520px) and (max-width: 1000px) {
+  #stage:not(.editor-engaged):has(.map-object.marker.selected) #command-bar {
+    left: auto;
+    right: 12px;
+    transform: none;
+    min-width: 0;
+    width: 290px;
+  }
+  #stage.marker-on-right:not(.editor-engaged):has(.map-object.marker.selected)
+    #command-bar {
+    left: 12px;
+    right: auto;
+  }
+}

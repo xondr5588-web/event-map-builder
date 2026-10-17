@@ -143,6 +143,8 @@ export class MarkerQuickEdit {
     }
     const q = this.cb.map.project(o.position),
       { width, height } = this.bounds();
+    const stage = this.shell.closest("#stage");
+    stage?.classList.toggle("marker-on-right", q.x > width / 2);
     if (q.x < -30 || q.y < -30 || q.x > width + 30 || q.y > height + 30) {
       this.actions.hidden = true;
       return;
@@ -156,10 +158,44 @@ export class MarkerQuickEdit {
         this.cb.map.size,
       );
     let y = q.y - radius - this.actions.offsetHeight - 8;
-    const minimum = matchMedia("(max-height:520px) and (max-width:1000px)")
+    let minimum = matchMedia("(max-height:520px) and (max-width:1000px)")
       .matches
       ? 60
       : 125;
+    const shell = this.shell.getBoundingClientRect();
+    const notice = document.getElementById("map-notice");
+    if (notice && !notice.hidden)
+      minimum = Math.max(
+        minimum,
+        notice.getBoundingClientRect().bottom - shell.top + 8,
+      );
+    if (
+      stage &&
+      matchMedia(
+        "(min-width:761px) and (max-width:1150px) and (min-height:521px)",
+      ).matches
+    ) {
+      const below = q.y <= height / 2;
+      const label = this.labelRect(o.id);
+      const available = below
+        ? height -
+          34 -
+          (label ? label.bottom - shell.top : q.y + radius + 45) -
+          12
+        : q.y - radius - 14 - 125;
+      stage.style.setProperty(
+        "--marker-inspector-top",
+        below ? "auto" : "125px",
+      );
+      stage.style.setProperty(
+        "--marker-inspector-bottom",
+        below ? "34px" : "auto",
+      );
+      stage.style.setProperty(
+        "--marker-inspector-height",
+        `${Math.max(60, Math.min(330, available))}px`,
+      );
+    }
     if (y < minimum) {
       const label = this.labelRect(o.id),
         shell = this.shell.getBoundingClientRect();
