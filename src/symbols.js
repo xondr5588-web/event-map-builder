@@ -40,7 +40,7 @@ const artwork = {
   police: `<svg data-symbol="police-emblem" x="1" y="0" width="38" height="38" viewBox="0 0 300 300">${emblemBody}</svg>`,
 };
 export const markerArtwork = (kind) =>
-  `<g data-marker-kind="${Object.hasOwn(artwork, kind) ? kind : "info"}" stroke-linejoin="round" stroke-linecap="round">${artwork[kind] || artwork.info}</g>`;
+  `<g data-marker-kind="${Object.hasOwn(artwork, kind) ? kind : "info"}" stroke-linejoin="round" stroke-linecap="round">${Object.hasOwn(artwork, kind) ? artwork[kind] : artwork.info}</g>`;
 export function markerSymbol(kind, size = 32) {
   return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 40 40">${markerArtwork(kind)}</svg>`;
 }

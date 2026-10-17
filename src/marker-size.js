@@ -37,7 +37,10 @@ export class MarkerSizeControl {
       if (e.target.id === "marker-size-slider")
         this.apply(Number(e.target.value));
     });
-    root.addEventListener("pointercancel", () => this.cancelPreview());
+    root.addEventListener("pointercancel", () => {
+      this.cancelPreview();
+      this.sync();
+    });
     root.addEventListener("focusout", (e) => {
       if (
         e.target.id === "marker-size-slider" &&

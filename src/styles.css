@@ -2238,3 +2238,74 @@ kbd {
   background: #edf5f1;
   min-height: 44px;
 }
+@media (max-width: 760px), (max-height: 520px) and (max-width: 1000px) {
+  #marker-size-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 55px;
+    gap: 3px 10px;
+    top: auto;
+    bottom: 10px;
+    padding: 10px 14px;
+    width: 340px;
+    max-height: calc(100% - 85px);
+  }
+  #marker-size-panel[hidden] {
+    display: none;
+  }
+  #marker-size-panel .size-heading {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: end;
+  }
+  #marker-size-panel .size-heading b {
+    display: none;
+  }
+  #marker-size-panel .size-tabs {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+  }
+  #marker-size-panel .size-value {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: end;
+  }
+  #marker-size-panel .size-value span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  #marker-size-panel .size-value output {
+    font-size: 20px;
+  }
+  #marker-size-slider {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+  }
+  #marker-size-panel .size-presets {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  #marker-size-panel .size-footer {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    margin: 0;
+  }
+  #marker-size-panel .size-hint {
+    display: none;
+  }
+  #stage:has(#marker-size-panel:not([hidden])) .map-footer {
+    visibility: hidden;
+  }
+}
+@media (max-height: 520px) and (max-width: 1000px) {
+  #stage:has(#marker-size-panel:not([hidden])) .map-toolbar {
+    top: 8px;
+  }
+  #stage:has(#marker-size-panel:not([hidden])) .map-top {
+    display: none;
+  }
+}

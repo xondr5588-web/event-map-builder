@@ -232,8 +232,8 @@ test("consistent booth, personnel, police, fire and facility symbols render in m
   await place(page, "shuttle", 0.7, 0.35);
   await place(page, "booth", 0.3, 0.35);
   await place(page, "safetyStaff", 0.5, 0.35);
-  await place(page, "fire", 0.3, 0.2);
-  await place(page, "medical", 0.7, 0.2);
+  await place(page, "fire", 0.3, 0.52);
+  await place(page, "medical", 0.7, 0.52);
   await expect(page.locator(".map-object.marker")).toHaveCount(6);
   await expect(
     page.locator('.map-object.marker [data-symbol="fire-emblem"] path'),

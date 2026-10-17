@@ -1296,6 +1296,11 @@ window.addEventListener(
   "keydown",
   safe(async (e) => {
     if (!editor) return;
+    if (e.key === "Escape" && !$("marker-size-panel").hidden) {
+      e.preventDefault();
+      sizeControl.close();
+      return;
+    }
     const typing =
       /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) ||
       e.target.isContentEditable;
