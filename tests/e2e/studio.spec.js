@@ -260,26 +260,32 @@ test("publication A4/A3 PDFs retain map, numbered directory and complete program
     .locator("[data-studio-form=import-program] button[type=submit]")
     .click();
   await page.locator("[data-studio=tab][data-id=publish]").click();
-  const downloadPending = page.waitForEvent("download");
-  await page.locator("[data-studio=html]").click();
-  const file = await downloadPending,
-    stream = await file.createReadStream();
-  let html = "";
-  for await (const c of stream) html += c;
   const tab = await page.context().newPage();
-  await tab.setContent(html);
-  await tab.emulateMedia({ media: "print" });
-  for (const format of ["A4", "A3"]) {
-    const path = testInfo.outputPath(`event-guide-${format}.pdf`);
+  for (const paper of [
+    "A4 landscape",
+    "A4 portrait",
+    "A3 landscape",
+    "A3 portrait",
+  ]) {
+    await page.locator("#publication-paper").selectOption(paper);
+    const downloadPending = page.waitForEvent("download");
+    await page.locator("[data-studio=html]").click();
+    const file = await downloadPending,
+      stream = await file.createReadStream();
+    let html = "";
+    for await (const c of stream) html += c;
+    expect(html).toContain(`@page{size:${paper};margin:8mm}`);
+    await tab.setContent(html);
+    await tab.emulateMedia({ media: "print" });
+    const path = testInfo.outputPath(
+      `event-guide-${paper.replace(" ", "-")}.pdf`,
+    );
     await tab.pdf({
       path,
-      format,
-      landscape: true,
       printBackground: true,
-      preferCSSPageSize: false,
-      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+      preferCSSPageSize: true,
     });
-    await testInfo.attach(`event-guide-${format}`, {
+    await testInfo.attach(`event-guide-${paper}`, {
       path,
       contentType: "application/pdf",
     });
