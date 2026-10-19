@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+test.beforeEach(async ({ page }) => {
+  page.errors = [];
+  page.on("pageerror", (e) => page.errors.push(e.message));
+});
+test.afterEach(async ({ page }) => expect(page.errors).toEqual([]));
 test("denied session cannot open editor or request Naver SDK", async ({
   page,
 }) => {
@@ -117,7 +122,8 @@ test("owner can continue a project on a second device through the authenticated 
   const second = await browser.newContext({ viewport: page.viewportSize() });
   await routes(second);
   const other = await second.newPage();
-  await other.goto("/?map=offline");
+  other.on("pageerror", (e) => page.errors.push(e.message));
+  await other.goto(new URL("/?map=offline", page.url()).href);
   await expect(other.locator("#project-title")).toHaveText(
     "기기 간 이어쓰기 검증",
   );
