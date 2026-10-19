@@ -13,7 +13,7 @@ import {
   transformGroup,
   resizeFacility,
 } from "../src/venue.js";
-import { distance, area, center } from "../src/geometry.js";
+import { distance, area, center, boundsXY } from "../src/geometry.js";
 import {
   normalizeProgram,
   programConflicts,
@@ -181,4 +181,17 @@ test("visitor publication redacts assignments, hidden internal objects, private 
   assert.equal(isDisplayed(p, staff, { mode: "visitor" }), false);
   p.objects[1].name = "새 무대";
   assert.equal(programVenue({ placeId: booth.id }, p), "새 무대");
+});
+
+test("publication bounds support the full 200,000-vertex import limit", () => {
+  const points = Array.from({ length: 200000 }, (_, i) => ({
+    x: i - 100000,
+    y: i % 10,
+  }));
+  assert.deepEqual(boundsXY(points), {
+    left: -100000,
+    right: 99999,
+    top: 0,
+    bottom: 9,
+  });
 });

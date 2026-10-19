@@ -175,3 +175,97 @@ test("schema upgrade backs up untouched originals once and rolls back all if any
   assert.equal((await r.read("projects", another.id)).schemaVersion, 1);
   r.close();
 });
+
+test("offline launch retries when connectivity returns and attaches one lifecycle listener", async () => {
+  const env = { BUCKET: new Bucket() },
+    r = await repo();
+  await r.save(newProject("offline work"), 0);
+  const originalAdd = globalThis.addEventListener,
+    originalRemove = globalThis.removeEventListener,
+    listeners = new Set();
+  globalThis.addEventListener = (name, fn) => {
+    if (name === "online") listeners.add(fn);
+  };
+  globalThis.removeEventListener = (name, fn) => {
+    if (name === "online") listeners.delete(fn);
+  };
+  let offline = true;
+  const fetcher = client(env),
+    sync = new CloudSync(r, {
+      fetcher: (...args) =>
+        offline ? Promise.reject(new Error("offline")) : fetcher(...args),
+    });
+  try {
+    assert.equal(await sync.start(), false);
+    assert.equal(listeners.size, 1);
+    const interval = sync.interval;
+    offline = false;
+    await [...listeners][0]();
+    assert.equal(sync.available, true);
+    assert.equal(listeners.size, 1);
+    assert.equal(sync.interval, interval);
+    assert.equal(
+      (await (await api(request("/api/projects"), env)).json()).projects.length,
+      1,
+    );
+    await sync.start();
+    assert.equal(listeners.size, 1);
+  } finally {
+    sync.stop();
+    r.close();
+    globalThis.addEventListener = originalAdd;
+    globalThis.removeEventListener = originalRemove;
+  }
+});
+test("busy project is reported as pending and synchronizes after editing ends", async () => {
+  const env = { BUCKET: new Bucket() },
+    r = await repo(),
+    p = await r.save(newProject("pending"), 0),
+    statuses = [];
+  let busy = true;
+  const sync = new CloudSync(r, {
+    fetcher: client(env),
+    busy: () => busy,
+    status: (s) => statuses.push(s),
+  });
+  sync.available = true;
+  await sync.sync();
+  assert.match(statuses.at(-1), /편집 종료/);
+  assert.equal(await r.read("meta", "cloud:" + p.id), undefined);
+  busy = false;
+  await sync.sync();
+  assert.match(statuses.at(-1), /클라우드 최신/);
+  assert.ok(await r.read("meta", "cloud:" + p.id));
+  sync.stop();
+  r.close();
+});
+test("remote trash conflict returns the preserved local copy as the active replacement", async () => {
+  const env = { BUCKET: new Bucket() },
+    a = await repo(),
+    b = await repo(),
+    events = [];
+  const ca = new CloudSync(a, { fetcher: client(env) }),
+    cb = new CloudSync(b, {
+      fetcher: client(env),
+      updated: (p, meta) => events.push({ p, meta }),
+    });
+  ca.available = cb.available = true;
+  const p = await a.save(newProject("original"), 0);
+  await ca.sync();
+  await cb.sync();
+  const bp = await b.read("projects", p.id);
+  bp.title = "unsent local changes";
+  await b.save(bp, bp.revision);
+  await a.trash(p.id);
+  await ca.sync();
+  await cb.sync();
+  const event = events.at(-1);
+  assert.equal(event.meta.replacesId, p.id);
+  assert.notEqual(event.p.id, p.id);
+  assert.match(event.p.title, /unsent local changes/);
+  assert.ok((await b.read("projects", p.id)).deletedAt);
+  ca.stop();
+  cb.stop();
+  a.close();
+  b.close();
+});

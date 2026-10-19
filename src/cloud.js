@@ -61,18 +61,33 @@ export class CloudSync {
     return data;
   }
   async start() {
-    try {
-      await this.request("/api/cloud/status");
-      this.available = true;
-      await this.sync();
-      clearInterval(this.interval);
-      this.interval = setInterval(() => this.sync(), 60000);
-      this.online = () => this.sync();
+    // Register retries even when the first launch is offline; attach each listener once.
+    if (!this.interval)
+      this.interval = setInterval(
+        () => (this.available ? this.sync() : this.start()),
+        60000,
+      );
+    if (!this.online) {
+      this.online = () => (this.available ? this.sync() : this.start());
       globalThis.addEventListener?.("online", this.online);
-    } catch (e) {
-      this.status("기기 저장 · 동기화 연결 대기");
     }
-    return this.available;
+    if (this.starting) return this.starting;
+    this.starting = (async () => {
+      try {
+        await this.request("/api/cloud/status");
+        this.available = true;
+        await this.sync();
+      } catch {
+        this.available = false;
+        this.status("기기 저장 · 동기화 연결 대기");
+      }
+      return this.available;
+    })();
+    try {
+      return await this.starting;
+    } finally {
+      this.starting = null;
+    }
   }
   schedule() {
     if (!this.available) return;
@@ -94,12 +109,20 @@ export class CloudSync {
               ...local.map((p) => p.id),
               ...remote.projects.map((p) => p.id),
             ]);
+          let pending = false;
           for (const id of ids)
-            await this.one(
-              id,
-              remote.projects.find((p) => p.id === id),
-            );
-          this.status("기기 저장 · 클라우드 최신");
+            if (
+              (await this.one(
+                id,
+                remote.projects.find((p) => p.id === id),
+              )) === false
+            )
+              pending = true;
+          this.status(
+            pending
+              ? "기기 저장 · 편집 종료 후 동기화 재확인"
+              : "기기 저장 · 클라우드 최신",
+          );
         } catch (e) {
           this.status(`기기 저장 유지 · ${e.message}`);
         }
@@ -107,7 +130,7 @@ export class CloudSync {
     return this.queue;
   }
   async one(id, remoteInfo) {
-    if (this.busy(id)) return;
+    if (this.busy(id)) return false;
     const local = await this.repo.read("projects", id),
       state = await this.repo.read("meta", `cloud:${id}`),
       hash = local ? await contentHash(local) : null;
@@ -130,13 +153,13 @@ export class CloudSync {
         this.busy(id) ||
         (await this.repo.read("projects", id)).revision !== local.revision
       )
-        return;
+        return false;
       if (hash === remoteHash) {
         await this.remember(id, r.etag, hash);
         return;
       }
       if (state?.hash === hash) {
-        if (this.busy(id)) return;
+        if (this.busy(id)) return false;
         if (incoming.deletedAt) {
           await this.repo.trash(id);
           await this.remember(id, r.etag, remoteHash);
@@ -170,7 +193,7 @@ export class CloudSync {
       if (incoming.deletedAt) {
         await this.repo.trash(id);
         await this.remember(id, r.etag, remoteHash);
-        await this.updated(recovered);
+        await this.updated(recovered, { replacesId: id });
         return;
       }
       let revision = local.revision;
@@ -185,7 +208,7 @@ export class CloudSync {
     }
     if (hash === state?.hash && remoteInfo) return;
     const current = await this.repo.read("projects", id);
-    if (current.revision !== local.revision || this.busy(id)) return;
+    if (current.revision !== local.revision || this.busy(id)) return false;
     try {
       const result = await this.request(
         `/api/projects/${encodeURIComponent(id)}`,
@@ -198,7 +221,7 @@ export class CloudSync {
     } catch (e) {
       if (e.status === 409) {
         this.schedule();
-        return;
+        return false;
       }
       throw e;
     }
@@ -215,5 +238,7 @@ export class CloudSync {
     clearTimeout(this.timer);
     clearInterval(this.interval);
     if (this.online) globalThis.removeEventListener?.("online", this.online);
+    this.interval = null;
+    this.online = null;
   }
 }

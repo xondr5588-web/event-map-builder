@@ -17,7 +17,7 @@
 
 ## 실행해 통과한 검사
 
-- `npm test`: 59개 통과. 기존 편집·파일·히스토리·저장소 회귀 검사 포함.
+- `npm test`: 63개 통과. 기존 편집·파일·히스토리·저장소 회귀 검사 포함.
 - `npm run build`: 개발용 정적 빌드.
 - `VITE_NAVER_MAP_CLIENT_ID=… npm run build:site`: 비공개 Worker 빌드.
 - `node scripts/verify-worker-build.mjs`: 내장 자산 응답, 익명 API 차단, 인증 파일·SW 확인.

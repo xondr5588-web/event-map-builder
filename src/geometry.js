@@ -116,3 +116,18 @@ export function samples(path, spacing = 40, max = 100) {
   }
   return out;
 }
+
+// Iterable bounds avoid spreading a large venue's vertices into function arguments.
+export function boundsXY(points) {
+  let left = Infinity,
+    right = -Infinity,
+    top = Infinity,
+    bottom = -Infinity;
+  for (const p of points) {
+    left = Math.min(left, p.x);
+    right = Math.max(right, p.x);
+    top = Math.min(top, p.y);
+    bottom = Math.max(bottom, p.y);
+  }
+  return { left, right, top, bottom };
+}

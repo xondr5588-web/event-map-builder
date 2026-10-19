@@ -157,13 +157,11 @@ test("own background, note editing and complete PNG work offline", async ({
     x.fillRect(280, 0, 65, 500);
     return c.toDataURL("image/png").split(",")[1];
   });
-  await page
-    .locator("[data-studio-file=background]")
-    .setInputFiles({
-      name: "venue-art.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(buffer, "base64"),
-    });
+  await page.locator("[data-studio-file=background]").setInputFiles({
+    name: "venue-art.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(buffer, "base64"),
+  });
   await expect(page.locator("[data-studio-form=background]")).toBeVisible();
   await page.locator("[name=width]").fill("100");
   await page.locator("[name=height]").fill("62.5");
@@ -271,4 +269,56 @@ test("publication A4/A3 PDFs retain map, numbered directory and complete program
     });
   }
   await tab.close();
+});
+
+test("saved camera survives reload and linked facility rename updates the program venue", async ({
+  page,
+}) => {
+  await batch(page);
+  await studio(page, "background");
+  await page.locator("[data-studio=save-view]").click();
+  await page.locator("[data-studio-form=view] [name=name]").fill("메인 행사장");
+  await page.locator("[data-studio-form=view] button[type=submit]").click();
+  const before = await data(page);
+  await closePanel(page);
+  await page.locator("[data-action=zoom-in]").click();
+  await expect
+    .poll(async () => Number(await page.locator("#zoom-level").innerText()))
+    .toBe(before.view.zoom + 1);
+  await studio(page, "background");
+  await page.locator("[data-studio=load-view]").first().click();
+  await expect(page.locator("#zoom-level")).toHaveText(
+    String(before.view.zoom),
+  );
+  await expect
+    .poll(async () => (await data(page)).view.zoom)
+    .toBe(before.view.zoom);
+  await page.reload();
+  await expect(page.locator("#zoom-level")).toHaveText(
+    String(before.view.zoom),
+  );
+  await studio(page, "programs");
+  await page.locator("[data-studio=program]").first().click();
+  const f = page.locator("[data-studio-form=program]");
+  await f.locator("[name=title]").fill("시설 연계 체험");
+  await f.locator("[name=date]").fill("2026-10-19");
+  await f.locator("[name=placeId]").selectOption(before.objects[0].id);
+  await f.locator("button[type=submit]").click();
+  await expect(page.locator(".studio-programs")).toContainText(
+    before.objects[0].name,
+  );
+  await page.locator("[data-studio=tab][data-id=facilities]").click();
+  await page
+    .locator(
+      `#panel-content [data-studio=details][data-id="${before.objects[0].id}"]`,
+    )
+    .last()
+    .click();
+  const d = page.locator("[data-studio-form=details]");
+  await d.locator("[name=name]").fill("지역문화 체험관");
+  await d.locator("button[type=submit]").click();
+  await page.locator("[data-studio=tab][data-id=programs]").click();
+  await expect(page.locator(".studio-programs")).toContainText(
+    "지역문화 체험관",
+  );
 });

@@ -393,6 +393,7 @@ export class Editor {
       const o = this.project.objects.find((o) => o.id === d.id),
         a = o.path[d.index],
         b = o.path[(d.index + 1) % o.path.length];
+      if (o.facility) o.facility.mode = "free";
       o.path.splice(d.index + 1, 0, {
         lat: (a.lat + b.lat) / 2,
         lng: (a.lng + b.lng) / 2,

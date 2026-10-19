@@ -1570,6 +1570,7 @@ async function boot() {
     project: () => project,
     selection: selectedObjects,
     map,
+    viewChanged,
     mutate,
     render: renderPanel,
     modal,
@@ -1650,8 +1651,12 @@ async function boot() {
         const n = $("cloud-status");
         if (n) n.textContent = msg;
       },
-      updated: async (saved) => {
-        if (saved.id === project.id && !dirty && !saving) {
+      updated: async (saved, { replacesId } = {}) => {
+        if (
+          (saved.id === project.id || replacesId === project.id) &&
+          !dirty &&
+          !saving
+        ) {
           if (!saved.deletedAt) {
             project = saved;
             history = new History();
@@ -1666,14 +1671,21 @@ async function boot() {
         if (panel === "projects") await renderProjects();
       },
     });
-    cloud.start().then(async () => {
-      if (firstDevice && !dirty && !history.undoStack.length) {
-        const list = await repo.list();
-        const recent = list.find((p) => p.id !== project.id);
-        if (recent) await openProject(recent.id);
-      }
-      firstDevice = false;
-    });
+    cloud
+      .start()
+      .then(async () => {
+        if (firstDevice && !dirty && !history.undoStack.length) {
+          const list = await repo.list();
+          const recent = list.find((p) => p.id !== project.id);
+          if (recent) await openProject(recent);
+        }
+        firstDevice = false;
+      })
+      .catch((e) => {
+        cloudStatus = `기기 저장 유지 · ${e.message}`;
+        const node = $("cloud-status");
+        if (node) node.textContent = cloudStatus;
+      });
   }
   if (notices.length) alertPersistent(notices.join(" "));
   // Periodic recovery versions, only when a new revision exists and after a successful save.

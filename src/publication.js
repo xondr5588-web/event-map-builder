@@ -1,6 +1,6 @@
 import { Renderer, escapeHTML as esc } from "./renderer.js";
 import { clone } from "./model.js";
-import { pointsOf, world, unworld, distance } from "./geometry.js";
+import { pointsOf, world, unworld, distance, boundsXY } from "./geometry.js";
 import { localPoint } from "./venue.js";
 import {
   directory,
@@ -39,13 +39,7 @@ export function schematicSVG(
       ),
     ];
   if (!points.length) points = [p.view.center];
-  const q = points.map((c) => world(c, 0)),
-    xs = q.map((x) => x.x),
-    ys = q.map((x) => x.y),
-    left = Math.min(...xs),
-    right = Math.max(...xs),
-    top = Math.min(...ys),
-    bottom = Math.max(...ys),
+  const { left, right, top, bottom } = boundsXY(points.map((c) => world(c, 0))),
     mid = { x: (left + right) / 2, y: (top + bottom) / 2 };
   const zoom = Math.min(
       26,
@@ -172,14 +166,10 @@ export function schedulePages(project) {
     pages.push(
       `<h2>${esc(date)} 프로그램 시간표</h2><div class="schedule-grid"><div class="schedule-axis"><h3>시간</h3><div class="schedule-track">${Array.from({ length: Math.ceil(span / 60) + 1 }, (_, i) => `<span style="top:${((i * 60) / span) * 100}%">${String(Math.floor((from + i * 60) / 60)).padStart(2, "0")}:00</span>`).join("")}</div></div>${columns}</div>`,
     );
-    if (items.some((p) => p.description))
-      for (const group of chunks(
-        items.filter((p) => p.description),
-        12,
-      ))
-        pages.push(
-          `<h2>${esc(date)} 프로그램 상세</h2>${agenda(group, project)}`,
-        );
+    for (const group of chunks(items, 12))
+      pages.push(
+        `<h2>${esc(date)} 프로그램 상세</h2>${agenda(group, project)}`,
+      );
   }
   return pages;
 }

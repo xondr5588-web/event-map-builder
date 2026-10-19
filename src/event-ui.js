@@ -328,9 +328,9 @@ export class EventStudio {
       if (v) {
         c.map.setView(clone(v.view));
         this.change("저장한 보기 적용", (p) => {
-          p.view = clone(v.view);
           p.settings.viewMode = v.mode;
         });
+        c.viewChanged();
       }
     }
     if (action === "delete-view")
