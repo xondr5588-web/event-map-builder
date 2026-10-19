@@ -931,6 +931,7 @@ a {
   font-size: 11px;
 }
 #toast {
+  pointer-events: none;
   position: fixed;
   bottom: 28px;
   left: 50%;
@@ -2363,7 +2364,13 @@ kbd {
   padding: 6px;
   border: 0;
 }
+.bulk-bar {
+  flex-wrap: wrap;
+}
 @media (max-width: 760px), (max-height: 520px) and (max-width: 1000px) {
+  .bulk-bar button {
+    min-height: 44px;
+  }
   .command-title > button {
     flex-basis: 44px;
     min-height: 44px;

@@ -64,6 +64,10 @@ test("touch copy, preview, place and nearby duplication preserve marker details 
     ".map-object.marker:not(.paste-preview) .object-hit",
   );
   await tap(hit, info);
+  await info.attach("marker-copy-actions", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
   await tap(page.locator('[data-marker-action="duplicate"]'), info);
   await expect(page.locator(".map-object.marker")).toHaveCount(2);
   await page.locator('.map-toolbar [data-action="undo"]').click();
