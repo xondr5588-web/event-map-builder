@@ -25,7 +25,7 @@ export class CloudSync {
   constructor(
     repo,
     {
-      fetcher = fetch,
+      fetcher = globalThis.fetch.bind(globalThis),
       busy = () => false,
       updated = () => {},
       notify = () => {},

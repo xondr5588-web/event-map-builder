@@ -35,6 +35,18 @@ const client =
       env,
     );
 const repo = () => new Repository("cloud-test-" + uid()).open();
+test("default browser fetch keeps its global receiver for authenticated cloud requests", async (t) => {
+  t.mock.method(globalThis, "fetch", async function (path, options) {
+    assert.equal(this, globalThis);
+    assert.equal(path, "/api/cloud/status");
+    assert.equal(options.credentials, "same-origin");
+    return Response.json({ available: true });
+  });
+  const cloud = new CloudSync({});
+  assert.deepEqual(await cloud.request("/api/cloud/status"), {
+    available: true,
+  });
+});
 test("authenticated cloud rejects anonymous, cross-origin, future data and isolates owners", async () => {
   const env = { BUCKET: new Bucket() },
     p = newProject();

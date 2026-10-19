@@ -38,17 +38,6 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
-      - id: editor_e2e
-        run: npm run test:e2e
-        timeout-minutes: 14
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.editor_e2e.outcome != 'skipped' && steps.editor_e2e.outcome != ''
-        with:
-          name: editor-playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 14
       - run: npm run build:private
         env:
           VITE_NAVER_MAP_CLIENT_ID: test-client
@@ -61,6 +50,20 @@ jobs:
         with:
           name: private-access-playwright-report
           path: playwright-report/
+          retention-days: 14
+      - run: npm run build
+        env:
+          VITE_NAVER_MAP_CLIENT_ID: test-client
+      - id: editor_e2e
+        run: npm run test:e2e
+        timeout-minutes: 14
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.editor_e2e.outcome != 'skipped' && steps.editor_e2e.outcome != ''
+        with:
+          name: editor-playwright-report
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 14
       - run: npm run build:site
         env:
