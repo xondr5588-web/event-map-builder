@@ -1,6 +1,12 @@
 import { CATALOG, DEFAULT_VIEW, kindInfo } from "./catalog.js";
 import { clamp, validCoord } from "./geometry.js";
-export const SCHEMA_VERSION = 1;
+import {
+  defaultEvent,
+  normalizeEvent,
+  normalizeDetails,
+  normalizeAnnotation,
+} from "./event-data.js";
+export const SCHEMA_VERSION = 2;
 export const uid = () => globalThis.crypto.randomUUID();
 export const clone = (x) => structuredClone(x);
 const text = (s, fallback = "") =>
@@ -70,6 +76,7 @@ export function newProject(title = "새 행사 운영도") {
     view: clone(DEFAULT_VIEW),
     settings: {
       layers: { area: true, line: true, marker: true },
+      viewMode: "all",
       labels: true,
       snap: true,
       autoSize: true,
@@ -78,7 +85,7 @@ export function newProject(title = "새 행사 운영도") {
       symbolSize: 1,
       markerSize: null,
     },
-    meta: { note: "", plan: defaultPlan() },
+    meta: { note: "", plan: defaultPlan(), event: defaultEvent() },
   };
 }
 export function newObject(type, kind, points, name) {
@@ -94,6 +101,11 @@ export function newObject(type, kind, points, name) {
     visible: true,
     locked: false,
     group: "",
+    bundle: "",
+    details: normalizeDetails({}, kind),
+    ...(kind === "note"
+      ? { annotation: normalizeAnnotation({ text: name || "안내 문구" }) }
+      : {}),
     rotation: 0,
     style: {
       color: info[1],
@@ -215,6 +227,17 @@ function normalizeObject(raw, type, index, ids, warnings, legacyLayer = {}) {
   o.visible = raw.visible !== false;
   o.locked = raw.locked === true;
   o.group = text(raw.group).slice(0, 80);
+  o.bundle = validId(raw.bundle) ? raw.bundle : "";
+  o.details = normalizeDetails(raw.details, kind);
+  if (kind === "note")
+    o.annotation = normalizeAnnotation(raw.annotation || { text: name });
+  if (type === "area" && raw.facility)
+    o.facility = {
+      width: number(raw.facility.width, 3, 0.5, 1000),
+      depth: number(raw.facility.depth, 3, 0.5, 1000),
+      rotation: number(raw.facility.rotation, 0, -360, 360),
+      mode: raw.facility.mode === "rectangle" ? "rectangle" : "free",
+    };
   const l = raw.label || {};
   o.label = {
     text: text(l.text, text(raw.labelText, name)),
@@ -239,7 +262,10 @@ export function migrate(input) {
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new Error("프로젝트 JSON 형식이 아닙니다.");
   let raw = input.project || input.data || input;
-  if (raw.schemaVersion != null && raw.schemaVersion !== SCHEMA_VERSION)
+  if (
+    raw.schemaVersion != null &&
+    ![1, SCHEMA_VERSION].includes(raw.schemaVersion)
+  )
     throw new Error(
       `지원하지 않는 스키마 버전: ${raw.schemaVersion}. 최신 프로그램으로 열어 주세요.`,
     );
@@ -265,6 +291,7 @@ export function migrate(input) {
   p.meta = {
     note: text(raw.meta?.note),
     plan: normalizePlan(raw.meta?.plan),
+    event: normalizeEvent(raw.meta?.event),
     ...(oldest
       ? { migratedFrom: "parking/flow/staff" }
       : old
@@ -290,6 +317,9 @@ export function migrate(input) {
         : "hybrid",
     };
   }
+  p.settings.viewMode = ["all", "visitor", "emergency"].includes(s.viewMode)
+    ? s.viewMode
+    : "all";
   p.settings.scaleWithMap = s.scaleWithMap !== false;
   p.settings.autoSize = s.autoSize !== false;
   // Anchor pre-upgrade screen offsets and symbol sizes at their saved zoom.
@@ -383,7 +413,7 @@ export function parseImport(str) {
   }
   if (data.format === "event-map-builder-backup") {
     if (
-      data.schemaVersion !== 1 ||
+      ![1, SCHEMA_VERSION].includes(data.schemaVersion) ||
       !Array.isArray(data.projects) ||
       data.projects.length > 300
     )

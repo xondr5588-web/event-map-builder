@@ -44,6 +44,10 @@ jobs:
           name: private-access-playwright-report
           path: playwright-report/
           retention-days: 14
+      - run: npm run build:site
+        env:
+          VITE_NAVER_MAP_CLIENT_ID: test-client
+      - run: node scripts/verify-worker-build.mjs
       - run: npm run build:pages
       - run: node scripts/verify-public-build.mjs
       - run: npm run test:access

@@ -1,8 +1,9 @@
 import { clone } from "./model.js";
 import { clamp, world, unworld, validCoord } from "./geometry.js";
-import { verifyPrivateAccess } from "./access.js";
+import { PRIVATE_MODE, verifyPrivateAccess } from "./access.js";
 export const MAP_CLIENT_ID = import.meta.env?.VITE_NAVER_MAP_CLIENT_ID || "";
-export const PLACE_URL = import.meta.env?.VITE_PLACE_SEARCH_URL || "";
+export const PLACE_URL =
+  import.meta.env?.VITE_PLACE_SEARCH_URL || (PRIVATE_MODE ? "/api/places" : "");
 let reloadSDK = false;
 export class MapAdapter {
   constructor(element, view, onChange, onStatus) {
@@ -310,11 +311,20 @@ export class MapAdapter {
     });
     if (!PLACE_URL) return address;
     const places = fetch(
-      `${PLACE_URL}${PLACE_URL.includes("?") ? "&" : "?"}query=${encodeURIComponent(query)}`,
-      { signal: AbortSignal.timeout(10000), credentials: "omit" },
+      `${PLACE_URL}${PLACE_URL.includes("?") ? "&" : "?"}${PLACE_URL === "/api/places" ? "q" : "query"}=${encodeURIComponent(query)}`,
+      {
+        signal: AbortSignal.timeout(10000),
+        credentials: PLACE_URL.startsWith("/") ? "same-origin" : "omit",
+      },
     )
       .then(async (r) => {
-        if (!r.ok) throw new Error("장소 검색 서버에 연결할 수 없습니다.");
+        if (!r.ok) {
+          let error;
+          try {
+            error = (await r.json()).error;
+          } catch {}
+          throw new Error(error || "장소 검색 서버에 연결할 수 없습니다.");
+        }
         return r.json();
       })
       .then((data) =>
@@ -322,16 +332,22 @@ export class MapAdapter {
           .map((a) => ({
             title: String(a.title).replace(/<[^>]*>/g, ""),
             address: a.roadAddress || a.address,
-            position: a.position || {
-              lat: Number(a.mapy) / 1e7,
-              lng: Number(a.mapx) / 1e7,
-            },
+            position:
+              a.position ||
+              (a.lat != null
+                ? { lat: Number(a.lat), lng: Number(a.lng) }
+                : {
+                    lat: Number(a.mapy) / 1e7,
+                    lng: Number(a.mapx) / 1e7,
+                  }),
           }))
           .filter((x) => validCoord(x.position)),
       );
     const results = await Promise.allSettled([places, address]),
       items = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
     if (!items.length && results.every((r) => r.status === "rejected"))
+      throw results[0].reason;
+    if (!items.length && results[0].status === "rejected")
       throw results[0].reason;
     return items.slice(0, 12);
   }

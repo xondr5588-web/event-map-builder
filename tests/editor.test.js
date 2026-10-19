@@ -183,3 +183,38 @@ test("panning, pinch and cancelled touches during paste never create objects", (
   assert.equal(f.calls.pan, 1);
   assert.equal(f.history.undoStack.length, 0);
 });
+
+test("selected mixed group drags together in touch gestures, preserves locks and cancels safely", () => {
+  const f = fixture(),
+    p = f.project();
+  p.settings.snap = false;
+  const area = newObject("area", "booth", [
+    { lat: 35.01, lng: 128.01 },
+    { lat: 35.01, lng: 128.02 },
+    { lat: 35, lng: 128.02 },
+  ]);
+  const locked = newObject("marker", "medical", [{ lat: 35.03, lng: 128.03 }]);
+  locked.locked = true;
+  p.objects.push(area, locked);
+  f.editor.selection = new Set(p.objects.map((o) => o.id));
+  const before = clone(p);
+  const touch = (x, y) => ({ ...f.event(x, y), pointerType: "touch" });
+  f.editor.down(touch(200, 300));
+  f.editor.move(touch(230, 320));
+  f.editor.up(touch(230, 320));
+  assert.equal(f.editor.selection.size, 3);
+  assert.equal(f.calls.pan, 0);
+  assert.notDeepEqual(
+    f.project().objects[0].position,
+    before.objects[0].position,
+  );
+  assert.notDeepEqual(f.project().objects[1].path, before.objects[1].path);
+  assert.deepEqual(f.project().objects[2], before.objects[2]);
+  assert.equal(f.history.undoStack.length, 1);
+  assert.deepEqual(f.history.undo(f.project()).objects, before.objects);
+  const current = clone(f.project());
+  f.editor.down(touch(200, 300));
+  f.editor.move(touch(245, 330));
+  f.editor.cancelGesture();
+  assert.deepEqual(f.project(), current);
+});

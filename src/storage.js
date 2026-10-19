@@ -1,4 +1,4 @@
-import { clone, migrate, uid } from "./model.js";
+import { clone, migrate, uid, SCHEMA_VERSION } from "./model.js";
 const request = (r) =>
   new Promise((resolve, reject) => {
     r.onsuccess = () => resolve(r.result);
@@ -43,12 +43,55 @@ export class Repository {
     tx.objectStore(store).put(clone(item));
     await done;
   }
+  async upgradeSchema() {
+    const old = (await this.all("projects")).filter(
+      (p) => (p.schemaVersion || 0) < SCHEMA_VERSION,
+    );
+    if (!old.length) return [];
+    // Normalize every record before writing anything. Retain the exact originals atomically.
+    const prepared = old.map((p) => migrate(p).project);
+    const tx = this.db.transaction(
+        ["projects", "legacy", "versions"],
+        "readwrite",
+      ),
+      done = completed(tx);
+    for (let i = 0; i < old.length; i++) {
+      const current = await request(tx.objectStore("projects").get(old[i].id));
+      if (
+        current.revision !== old[i].revision ||
+        current.schemaVersion === SCHEMA_VERSION
+      )
+        continue;
+      tx.objectStore("legacy").put({
+        id: `schema:${SCHEMA_VERSION}:${old[i].id}:${old[i].revision}`,
+        raw: JSON.stringify(current),
+        ts: Date.now(),
+      });
+      tx.objectStore("versions").put({
+        id: uid(),
+        projectId: current.id,
+        label: "행사 제작 기능 업데이트 전 원본",
+        ts: Date.now(),
+        legacy: true,
+        data: clone(current),
+      });
+      tx.objectStore("projects").put(prepared[i]);
+    }
+    await done;
+    return [
+      `이전 프로젝트 ${old.length}개를 원본 백업 후 새 형식으로 이전했습니다.`,
+    ];
+  }
   async list(includeTrash = false) {
     return (await this.all("projects"))
       .filter((p) => includeTrash || !p.deletedAt)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
-  async save(project, expected = project.revision) {
+  async save(
+    project,
+    expected = project.revision,
+    { preserveUpdatedAt = false } = {},
+  ) {
     const copy = clone(project),
       tx = this.db.transaction("projects", "readwrite"),
       done = completed(tx);
@@ -63,7 +106,7 @@ export class Repository {
       throw new ConflictError();
     }
     copy.revision = (old?.revision || 0) + 1;
-    copy.updatedAt = Date.now();
+    copy.updatedAt = preserveUpdatedAt ? project.updatedAt : Date.now();
     delete copy.deletedAt;
     s.put(copy);
     await done;
@@ -157,7 +200,7 @@ export class Repository {
   async backup() {
     return {
       format: "event-map-builder-backup",
-      schemaVersion: 1,
+      schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       projects: await this.list(true),
       versions: await this.all("versions"),

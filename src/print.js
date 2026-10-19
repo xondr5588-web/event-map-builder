@@ -1,3 +1,4 @@
+import { isDisplayed } from "./event-data.js";
 import { kindInfo } from "./catalog.js";
 import { escapeHTML } from "./renderer.js";
 import { markerSymbol } from "./symbols.js";
@@ -18,7 +19,11 @@ export class PrintView {
       this.layout();
     });
     window.addEventListener("beforeprint", () => {
-      if (document.body.classList.contains("report-mode")) return;
+      if (
+        document.body.classList.contains("report-mode") ||
+        document.getElementById("event-publication")
+      )
+        return;
       if (!this.active) this.enter();
       this.map.resize();
       this.editor.request();
@@ -35,9 +40,11 @@ export class PrintView {
       plan.venue,
       [plan.startDate, plan.endDate].filter(Boolean).join(" ~ "),
       plan.organizer,
-      plan.agency,
-      plan.manager && `총괄 ${plan.manager} ${plan.phone}`,
-      p.meta.note,
+      p.settings.viewMode !== "visitor" && plan.agency,
+      p.settings.viewMode !== "visitor" &&
+        plan.manager &&
+        `총괄 ${plan.manager} ${plan.phone}`,
+      p.settings.viewMode !== "visitor" && p.meta.note,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -45,7 +52,7 @@ export class PrintView {
       `${plan.documentNo ? plan.documentNo + " · " : ""}개정 ${plan.revision} · ${PLAN_STATUS[plan.status]} · ${new Date().toLocaleDateString("ko-KR")}`;
     const kinds = new Map();
     for (const o of p.objects)
-      if (o.visible && p.settings.layers[o.type]) {
+      if (isDisplayed(p, o)) {
         const key = `${o.type}:${o.kind}:${o.style.color}`;
         if (!kinds.has(key))
           kinds.set(key, {

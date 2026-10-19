@@ -17,6 +17,7 @@ export function zoomScale(project, zoom) {
     : clamp(2 ** (delta * 0.18), 0.7, 1.35);
 }
 export function elementScale(project, object, zoom, viewport) {
+  if (object.kind === "note") return 1;
   // An explicit screen size takes precedence over legacy ratios and automatic caps.
   // 50 is the marker's white background diameter, excluding its selection outline.
   if (object.type === "marker") {

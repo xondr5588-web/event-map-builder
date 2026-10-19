@@ -1,3 +1,5 @@
+import { CloudSync } from "./cloud.js";
+import { EventStudio } from "./event-ui.js";
 import "./styles.css";
 import { PRIVATE_MODE, verifyPrivateAccess } from "./access.js";
 import { CATALOG, TYPE_LABELS, kindInfo } from "./catalog.js";
@@ -67,7 +69,11 @@ let project = newProject(),
   editor,
   sizeControl,
   quickEdit,
-  printer;
+  printer,
+  studio,
+  cloud;
+let cloudStatus = "이 기기에 저장",
+  firstDevice = false;
 let panel = "tools",
   multi = false,
   objectQuery = "",
@@ -226,6 +232,7 @@ async function flush() {
         }
         status(`자동저장 완료 · ${time(project.updatedAt)}`);
         saveError = false;
+        cloud?.schedule();
         $("project-title").textContent = project.title;
       } catch (e) {
         ok = false;
@@ -320,7 +327,7 @@ function toolCard(type, kind, wide = false) {
   return `<button class="tool-card ${active ? "active" : ""} ${wide ? "wide" : ""}" data-tool="${type}:${kind}" style="--tool-color:${info[1]}" aria-label="${esc(info[0])} 만들기"><span class="tool-icon">${type === "marker" ? markerSymbol(kind, 34) : icon(info[2], 21)}</span><span class="tool-text">${esc(info[0])}</span></button>`;
 }
 function renderTools() {
-  return `<div class="panel-intro"><b>현장을 그리다.</b>구역과 동선, 사람을 지도 위에 배치하세요.</div><label class="tool-name">새 객체 이름 <span class="small muted">비워두면 자동으로 이름을 붙입니다.</span><input id="tool-name" placeholder="예: 제1주차장" maxlength="120" value="${esc(currentToolName)}"/></label>${favorite.length ? `<div class="section-title">즐겨찾는 마커</div><div class="tool-grid">${favorite.map((k) => toolCard("marker", k)).join("")}</div>` : ""}${
+  return `<button data-action="studio" class="studio-launch"><span>EVENT STUDIO</span><b>행사 빠른 제작</b><small>부스 배치 · 시설 안내 · 프로그램 · 출력 →</small></button><div class="panel-intro"><b>현장을 그리다.</b>구역과 동선, 사람을 지도 위에 배치하세요.</div><label class="tool-name">새 객체 이름 <span class="small muted">비워두면 자동으로 이름을 붙입니다.</span><input id="tool-name" placeholder="예: 제1주차장" maxlength="120" value="${esc(currentToolName)}"/></label>${favorite.length ? `<div class="section-title">즐겨찾는 마커</div><div class="tool-grid">${favorite.map((k) => toolCard("marker", k)).join("")}</div>` : ""}${
     recent.length
       ? `<div class="section-title">최근 사용</div><div class="tool-grid">${recent
           .slice(0, 2)
@@ -378,7 +385,7 @@ function renderObjects() {
 }
 async function renderProjects() {
   const host = $("panel-content");
-  host.innerHTML = `<div class="row">${button("new-project", "새 프로젝트", "plus", "primary")}${button("import", "가져오기", "upload")}</div><div class="section-title">최근 프로젝트</div><div id="project-list" aria-live="polite">불러오는 중…</div><div class="section-title">안전하게 보관하기</div><div class="row wrap">${button("backup", "전체 백업", "download")}${button("trash-list", "휴지통", "trash")}</div>`;
+  host.innerHTML = `<div class="cloud-status"><span id="cloud-status">${esc(cloudStatus)}</span>${PRIVATE_MODE ? button("cloud-sync", "기기 간 동기화", "refresh") : ""}</div><div class="row">${button("new-project", "새 프로젝트", "plus", "primary")}${button("import", "가져오기", "upload")}</div><div class="section-title">최근 프로젝트</div><div id="project-list" aria-live="polite">불러오는 중…</div><div class="section-title">안전하게 보관하기</div><div class="row wrap">${button("backup", "전체 백업", "download")}${button("trash-list", "휴지통", "trash")}</div>`;
   const target = $("project-list");
   if (!repo) {
     target.textContent = "저장소를 연결하지 못했습니다.";
@@ -403,13 +410,15 @@ function renderPanel() {
   const body = $("panel-content"),
     scroll = body.scrollTop;
   body.innerHTML =
-    panel === "plan"
-      ? planningHTML(project)
-      : panel === "objects"
-        ? renderObjects()
-        : panel === "properties"
-          ? inspectorHTML()
-          : renderTools();
+    panel === "studio"
+      ? studio.render()
+      : panel === "plan"
+        ? planningHTML(project)
+        : panel === "objects"
+          ? renderObjects()
+          : panel === "properties"
+            ? inspectorHTML()
+            : renderTools();
   body.scrollTop = scroll;
 }
 function selectedObjects() {
@@ -422,7 +431,7 @@ function inspectorHTML() {
     return `<div class="empty-state">지도에서 객체를 선택해 주세요.</div>`;
   const many = objects.length > 1,
     locked = objects.every((o) => o.locked);
-  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div>${objects.some((x) => x.type === "marker") ? `<div class="inspector-size">${button("selected-marker-size", "마커 크기 조절", "size")}</div>` : ""}<div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("copy", "복사", "copy")}${button("duplicate", "복제", "duplicate")}${clipboard.length ? button("paste", "붙여넣기", "paste") : ""}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}${objects.some((x) => x.type !== "marker") ? `<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${operationsFields(objects, project)}`;
+  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div>${objects.some((x) => x.type === "marker") ? `<div class="inspector-size">${button("selected-marker-size", "마커 크기 조절", "size")}</div>` : ""}<div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("copy", "복사", "copy")}${button("duplicate", "복제", "duplicate")}${clipboard.length ? button("paste", "붙여넣기", "paste") : ""}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}${objects.some((x) => x.type !== "marker") ? `<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many ? `<div class="section-title">안내 정보</div><button data-studio="details" data-id="${o.id}">시설 번호·설명·규격 수정</button>${o.bundle || o.group ? '<button data-studio="select-group">같은 그룹 선택</button>' : ""}${o.kind === "note" ? `<label>안내 문구<textarea data-prop="annotation.text" maxlength="1000" rows="4" ${o.locked ? "disabled" : ""}>${esc(o.annotation.text)}</textarea></label><div class="two-col"><label>글자 크기<input type="number" data-prop="annotation.fontSize" min="10" max="72" value="${o.annotation.fontSize}"/></label><label>상자 너비<input type="number" data-prop="annotation.width" min="60" max="600" value="${o.annotation.width}"/></label><label>글자색<input type="color" data-prop="annotation.textColor" value="${o.annotation.textColor}"/></label><label>배경색<input type="color" data-prop="annotation.background" value="${o.annotation.background}"/></label></div>` : ""}` : '<button data-studio="transform">그룹 정렬·회전</button>'}${operationsFields(objects, project)}`;
 }
 function renderInspector() {
   if (!editor) return;
@@ -671,7 +680,7 @@ function more() {
     .querySelector(".menu-grid")
     .insertAdjacentHTML(
       "afterbegin",
-      `${button("plan", "행사 운영계획", "folder")}${button("operations-report", "운영계획서 / PDF", "print")}${button("deployment-csv", "배치 명세 CSV", "download")}`,
+      `${button("studio", "행사 빠른 제작", "stage")}${button("plan", "행사 운영계획", "folder")}${button("operations-report", "운영계획서 / PDF", "print")}${button("deployment-csv", "배치 명세 CSV", "download")}`,
     );
   if (PRIVATE_MODE) {
     const logout = document.createElement("a");
@@ -745,6 +754,17 @@ async function install() {
   );
 }
 const actions = {
+  "cloud-sync": async () => {
+    if (!(await flush())) return;
+    if (!cloud) return;
+    if (cloud.available) await cloud.sync();
+    else await cloud.start();
+    if (panel === "projects") await renderProjects();
+  },
+  studio: () => {
+    $("modal").close();
+    showPanel("studio");
+  },
   "marker-size": () => {
     if (!$("marker-size-panel").hidden) sizeControl.close();
     else {
@@ -1268,6 +1288,8 @@ document.addEventListener(
           return;
         }
         const limits = {
+          "annotation.fontSize": [10, 72],
+          "annotation.width": [60, 600],
           "style.width": [1, 30],
           "style.opacity": [0, 100],
           "style.spacing": [1, 500],
@@ -1495,6 +1517,7 @@ async function boot() {
   let notices = [];
   try {
     repo = await new Repository().open();
+    notices.push(...(await repo.upgradeSchema()));
     notices.push(...(await repo.migrateLegacy(localStorage)));
     notices.push(...(await recoverJournals(repo, localStorage)));
     let list = await repo.list(),
@@ -1502,6 +1525,7 @@ async function boot() {
     try {
       last = localStorage.getItem("emb:last-project");
     } catch {}
+    firstDevice = !list.length;
     project =
       list.find((p) => p.id === last) ||
       list[0] ||
@@ -1540,6 +1564,27 @@ async function boot() {
         if (localStorage.getItem("emb:haptic") !== "off")
           navigator.vibrate?.(12);
       } catch {}
+    },
+  });
+  studio = new EventStudio({
+    project: () => project,
+    selection: selectedObjects,
+    map,
+    mutate,
+    render: renderPanel,
+    modal,
+    closeModal: () => $("modal").close(),
+    closePanel,
+    toast,
+    confirm: confirmDialog,
+    place: (objects) => {
+      editor.startPlacement(objects);
+      renderCommand();
+    },
+    select: (ids) => {
+      editor.selection = new Set(ids);
+      editor.setMode("select");
+      refresh();
     },
   });
   printer = new PrintView(map, editor, () => project);
@@ -1586,6 +1631,50 @@ async function boot() {
   status(readOnly ? "저장소 연결 실패" : "자동저장 준비됨", readOnly);
   changedMap();
   map.start();
+  if (PRIVATE_MODE && repo) {
+    cloud = new CloudSync(repo, {
+      busy: (id) =>
+        id === project.id &&
+        (dirty ||
+          saving ||
+          !!editor.drag ||
+          !!editor.preview ||
+          !!editor.placement ||
+          !!editor.tool ||
+          $("modal").open ||
+          printer.active ||
+          document.body.classList.contains("report-mode")),
+      notify: alertPersistent,
+      status: (msg) => {
+        cloudStatus = msg;
+        const n = $("cloud-status");
+        if (n) n.textContent = msg;
+      },
+      updated: async (saved) => {
+        if (saved.id === project.id && !dirty && !saving) {
+          if (!saved.deletedAt) {
+            project = saved;
+            history = new History();
+            editor.cancel();
+            map.setView(project.view);
+            refresh();
+          } else
+            alertPersistent(
+              "다른 기기에서 이 프로젝트를 휴지통으로 옮겼습니다. 작업을 계속하면 복구 사본으로 저장됩니다.",
+            );
+        }
+        if (panel === "projects") await renderProjects();
+      },
+    });
+    cloud.start().then(async () => {
+      if (firstDevice && !dirty && !history.undoStack.length) {
+        const list = await repo.list();
+        const recent = list.find((p) => p.id !== project.id);
+        if (recent) await openProject(recent.id);
+      }
+      firstDevice = false;
+    });
+  }
   if (notices.length) alertPersistent(notices.join(" "));
   // Periodic recovery versions, only when a new revision exists and after a successful save.
   setInterval(async () => {

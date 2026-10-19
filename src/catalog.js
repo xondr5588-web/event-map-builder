@@ -1,5 +1,10 @@
 export const CATALOG = {
   area: {
+    booth: ["행사부스", "#d68736", "stage"],
+    stage: ["무대", "#7561b8", "stage"],
+    seating: ["관람석", "#5484ad", "people"],
+    parkingSlot: ["주차면", "#30836d", "parking"],
+    food: ["먹거리 구역", "#d16749", "area"],
     parking: ["주차장", "#23956e", "parking"],
     event: ["행사장", "#e88332", "stage"],
     vip: ["관계자 주차장", "#b59324", "star"],
@@ -20,6 +25,7 @@ export const CATALOG = {
     accessible: ["교통약자 동선", "#3276aa", "walk"],
   },
   marker: {
+    note: ["안내 문구", "#365d70", "edit"],
     parkingStaff: ["주차관리원", "#cf782f", "staff"],
     safetyStaff: ["안전요원", "#365a7d", "shield"],
     carIn: ["차량 진입(IN)", "#279b72", "in"],

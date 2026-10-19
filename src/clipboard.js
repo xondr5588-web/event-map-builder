@@ -1,3 +1,4 @@
+import { localPoint, localXY } from "./venue.js";
 import { clone, uid } from "./model.js";
 import { pointsOf, validCoord } from "./geometry.js";
 
@@ -11,6 +12,8 @@ export function makeCopies(objects, existing = []) {
   );
   if (vertices > 200000)
     throw new Error("프로젝트의 꼭짓점 한도(200,000개)를 초과합니다.");
+  const bundles = new Map(),
+    numbers = new Set(existing.map((o) => o.details?.number).filter(Boolean));
   const names = new Set(existing.map((o) => o.name));
   return objects.map((original) => {
     const o = clone(original),
@@ -20,6 +23,19 @@ export function makeCopies(objects, existing = []) {
     while (names.has(name)) name = `${base} ${n++}`;
     names.add(name);
     o.id = uid();
+    if (o.bundle) {
+      if (!bundles.has(o.bundle)) bundles.set(o.bundle, uid());
+      o.bundle = bundles.get(o.bundle);
+    }
+    if (o.details?.number) {
+      const base = o.details.number;
+      let n = 2,
+        value = base;
+      while (numbers.has(value)) value = `${base}-${n++}`;
+      numbers.add(value);
+      o.details.number = value;
+      if (o.label.text === base) o.label.text = value;
+    }
     o.name = name;
     if (o.label.text === original.name) o.label.text = name;
     o.locked = false;
@@ -54,7 +70,16 @@ export function positionCopies(
     at = target ? map.project(target) : origin,
     dx = at.x - origin.x + offset.x,
     dy = at.y - origin.y + offset.y;
+  const physical = objects.some((o) => o.facility);
+  const geographicOrigin = physical ? map.unproject(origin) : null;
+  const geographicTarget = physical
+    ? map.unproject({ x: origin.x + dx, y: origin.y + dy })
+    : null;
   const move = (p) => {
+    if (physical) {
+      const q = localXY(geographicOrigin, p);
+      return localPoint(geographicTarget, q.x, q.y);
+    }
     const q = map.project(p),
       moved = map.unproject({ x: q.x + dx, y: q.y + dy });
     if (!validCoord(moved))

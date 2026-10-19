@@ -1,3 +1,5 @@
+import { isDisplayed } from "./event-data.js";
+import { localPoint } from "./venue.js";
 import { kindInfo } from "./catalog.js";
 import { markerArtwork } from "./symbols.js";
 import { elementScale, labelScale } from "./scaling.js";
@@ -34,7 +36,11 @@ export class Renderer {
     this.shapes = el("g", { class: "objects" });
     this.handles = el("g", { class: "handles" });
     this.draft = el("g", { class: "draft", "pointer-events": "none" });
-    svg.append(this.shapes, this.draft, this.handles);
+    this.background = el("image", {
+      "pointer-events": "none",
+      preserveAspectRatio: "none",
+    });
+    svg.append(this.background, this.shapes, this.draft, this.handles);
   }
   create(o) {
     const group = el("g", {
@@ -124,6 +130,28 @@ export class Renderer {
     );
     for (const pattern of this.svg.querySelectorAll("defs pattern"))
       attr(pattern, "patternTransform", `rotate(45) scale(${patternScale})`);
+    const bg = project.meta.event?.background;
+    attr(this.background, "display", bg?.enabled ? "inline" : "none");
+    if (bg?.enabled) {
+      const a = this.map.project(
+          localPoint(bg.center, -bg.width / 2, -bg.height / 2, bg.rotation),
+        ),
+        b = this.map.project(
+          localPoint(bg.center, bg.width / 2, -bg.height / 2, bg.rotation),
+        ),
+        c = this.map.project(
+          localPoint(bg.center, -bg.width / 2, bg.height / 2, bg.rotation),
+        );
+      attr(this.background, "href", bg.data);
+      attr(this.background, "width", 1);
+      attr(this.background, "height", 1);
+      attr(this.background, "opacity", bg.opacity);
+      attr(
+        this.background,
+        "transform",
+        `matrix(${b.x - a.x} ${b.y - a.y} ${c.x - a.x} ${c.y - a.y} ${a.x} ${a.y})`,
+      );
+    }
     const keep = new Set(),
       buckets = new Map(),
       mapKey = `${this.map.view.center.lat}:${this.map.view.center.lng}:${this.map.view.zoom}:${width}:${height}`;
@@ -132,7 +160,7 @@ export class Renderer {
       const e = this.entries.get(o.id) || this.create(o),
         selected = selection.has(o.id),
         previewing = previewIds.has(o.id),
-        visible = o.visible && (previewing || project.settings.layers[o.type]);
+        visible = previewing || isDisplayed(project, o);
       attr(e.group, "display", visible ? "inline" : "none");
       if (!visible) continue;
       attr(
@@ -157,7 +185,34 @@ export class Renderer {
         attr(e.hit, "cy", pts[0].y);
         attr(e.hit, "r", Math.max(24, 23 * scale));
         const signature = `${o.kind}:${o.style.color}:${o.locked}`;
-        if (e.signature !== signature) {
+        if (o.kind === "note") {
+          const a = o.annotation,
+            lines = [];
+          let line = "",
+            used = 0;
+          for (const ch of (a?.text || o.name).slice(0, 1000)) {
+            const cw = /[\u1100-\uffff]/.test(ch)
+              ? a.fontSize
+              : a.fontSize * 0.58;
+            if (ch === "\n" || used + cw > a.width - 20) {
+              lines.push(line);
+              line = "";
+              used = 0;
+            }
+            if (ch !== "\n") {
+              line += ch;
+              used += cw;
+            }
+          }
+          lines.push(line);
+          const h = lines.length * a.fontSize * 1.4 + 20,
+            sig = JSON.stringify([a, o.locked]);
+          if (e.signature !== sig) {
+            e.shape.innerHTML = `<rect x="${-a.width / 2}" y="${-h / 2}" width="${a.width}" height="${h}" rx="5" fill="${a.background}" stroke="${a.border ? o.style.color : "none"}"/><text fill="${a.textColor}" font-family="sans-serif" font-size="${a.fontSize}" text-anchor="${a.align}">${lines.map((l, i) => `<tspan x="${a.align === "start" ? -a.width / 2 + 10 : a.align === "end" ? a.width / 2 - 10 : 0}" y="${-h / 2 + 15 + a.fontSize + i * a.fontSize * 1.4}">${escapeHTML(l)}</tspan>`).join("")}</text>`;
+            e.signature = sig;
+          }
+          attr(e.hit, "r", Math.max(24, Math.min(a.width / 2, h / 2) * scale));
+        } else if (e.signature !== signature) {
           e.shape.innerHTML = `<circle class="marker-halo" r="25" fill="white" stroke="${o.style.color}" stroke-width="2.2"/><g transform="translate(-20,-20)">${markerArtwork(o.kind)}</g>${o.locked ? '<g data-locked-indicator="true" transform="translate(18,18)" pointer-events="none"><circle r="8" fill="#23423d" stroke="white" stroke-width="1.5"/><path d="M-3-1v-2a3 3 0 016 0v2m-7 0h8v6h-8z" fill="none" stroke="white" stroke-width="1.4" stroke-linejoin="round"/></g>' : ""}`;
           e.signature = signature;
         }
@@ -268,6 +323,10 @@ export class Renderer {
         y += count * 30 * textScale;
       }
       const show =
+        o.kind !== "note" &&
+        (!o.facility ||
+          selected ||
+          Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) > 10) &&
         project.settings.labels &&
         o.label.visible &&
         (selected ||
@@ -277,7 +336,9 @@ export class Renderer {
         const labelText =
           o.kind === "measure"
             ? `${o.label.text} · ${meters(length(o.path))}`
-            : o.label.text;
+            : o.details?.number && o.label.text !== o.details.number
+              ? `${o.details.number} · ${o.label.text}`
+              : o.label.text;
         const limit =
           project.settings.autoSize !== false
             ? Math.max(90, Math.min(180, width * 0.42)) / textScale - 20

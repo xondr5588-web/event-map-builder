@@ -1,4 +1,5 @@
 import { area, length, meters, squareMeters, center } from "./geometry.js";
+import { isDisplayed } from "./event-data.js";
 import { kindInfo } from "./catalog.js";
 export const PLAN_FIELDS = {
   startDate: "행사 시작일",
@@ -30,8 +31,7 @@ export const STAFF_KINDS = new Set([
   "safetyStaff",
   "guideStaff",
 ]);
-export const visibleObjects = (p) =>
-  p.objects.filter((o) => o.visible && p.settings.layers[o.type]);
+export const visibleObjects = (p) => p.objects.filter((o) => isDisplayed(p, o));
 export function parkingCapacity(o, p) {
   if (o.type !== "area" || !["parking", "vip"].includes(o.kind)) return null;
   const manual = o.operations?.capacity;
@@ -43,8 +43,10 @@ export function parkingCapacity(o, p) {
     estimated: manual == null,
   };
 }
-export function operationalSummary(p) {
-  const objects = visibleObjects(p),
+export function operationalSummary(p, { scope = "all" } = {}) {
+  const objects = (scope === "visible" ? visibleObjects(p) : p.objects).filter(
+      (o) => o.kind !== "note",
+    ),
     resources = new Map();
   let staff = 0,
     parking = 0,
@@ -59,7 +61,11 @@ export function operationalSummary(p) {
       parking += capacity.count;
       if (capacity.estimated) estimatedParking += capacity.count;
     }
-    if (o.type === "line") routeLength += length(o.path);
+    if (
+      o.type === "line" &&
+      !["cone", "tape", "block", "measure"].includes(o.kind)
+    )
+      routeLength += length(o.path);
     if (o.type === "line" && o.kind === "cone")
       cones += Math.ceil(length(o.path) / o.style.spacing) + 1;
     if (o.type === "marker") {

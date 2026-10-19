@@ -68,7 +68,7 @@ test("parking estimates use the configured density and manual zero capacity is p
   p.objects = [o];
   assert.equal(migrate(p).project.objects[0].operations.capacity, 123);
 });
-test("summary counts people separately from facilities and excludes hidden layers", () => {
+test("summary keeps whole-plan totals stable and offers explicit visible counts", () => {
   const p = newProject();
   for (const [k, q] of [
     ["parkingStaff", 4],
@@ -87,9 +87,11 @@ test("summary counts people separately from facilities and excludes hidden layer
   assert.equal(s.resources.find((r) => r.kind === "police").count, 2);
   assert.equal(s.resources.find((r) => r.kind === "booth").count, 5);
   p.objects[0].visible = false;
-  assert.equal(operationalSummary(p).staff, 3);
+  assert.equal(operationalSummary(p).staff, 7);
+  assert.equal(operationalSummary(p, { scope: "visible" }).staff, 3);
   p.settings.layers.marker = false;
-  assert.equal(operationalSummary(p).staff, 0);
+  assert.equal(operationalSummary(p).staff, 7);
+  assert.equal(operationalSummary(p, { scope: "visible" }).staff, 0);
 });
 test("CSV includes deployment fields, unicode, coordinates and neutralizes spreadsheet formulas", () => {
   const p = newProject("행사");

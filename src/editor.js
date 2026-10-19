@@ -201,10 +201,21 @@ export class Editor {
       this.mode === "select" &&
       !e.shiftKey &&
       !this.cb.multi();
-    if (quickMarker && (this.selection.size !== 1 || !this.selection.has(id)))
-      this.select(id);
+    if (quickMarker && !this.selection.has(id)) this.select(id);
     if (quickMarker) this.request();
-    const directMove = quickMarker && !o.locked && handle !== "label";
+    const groupMove =
+      o &&
+      this.selection.has(id) &&
+      !this.tool &&
+      !this.placement &&
+      !this.editing &&
+      this.mode === "select" &&
+      !e.shiftKey &&
+      !this.cb.multi() &&
+      handle !== "label" &&
+      !o.locked;
+    const directMove =
+      (quickMarker || groupMove) && !o.locked && handle !== "label";
     const editable =
       (this.editing && this.selection.has(id) && !o?.locked) || directMove;
     const label =
@@ -228,6 +239,7 @@ export class Editor {
       editable,
       quickMarker,
       directMove,
+      groupMove,
       shift: e.shiftKey,
       before: editable && !directMove ? clone(this.project) : null,
       startCoord: this.map.unproject(p),
@@ -314,7 +326,10 @@ export class Editor {
         o.label.manual = true;
       } else if (d.handle === "vertex") {
         const v = this.snap(this.map.unproject(p), o.id);
-        if (validCoord(v)) o.path[d.index] = v;
+        if (validCoord(v)) {
+          o.path[d.index] = v;
+          if (o.facility) o.facility.mode = "free";
+        }
         this.vertex = d.index;
       } else if (d.handle !== "midpoint") {
         const shift = (q) => {
@@ -324,7 +339,17 @@ export class Editor {
             y: v.y + p.y - d.start.y,
           });
         };
-        if (o.type === "marker")
+        if (d.groupMove && this.selection.size > 1) {
+          for (const original of d.before.objects.filter(
+            (q) => this.selection.has(q.id) && !q.locked,
+          )) {
+            const item = this.project.objects.find((q) => q.id === original.id);
+            if (item.position) item.position = shift(original.position);
+            else item.path = original.path.map(shift);
+            if (original.label.position)
+              item.label.position = shift(original.label.position);
+          }
+        } else if (o.type === "marker")
           o.position = this.snap(shift(d.original.position), o.id);
         else o.path = d.original.path.map(shift);
         if (d.original.label.position)
