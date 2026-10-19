@@ -2391,6 +2391,18 @@ kbd {
   background: #fff2db;
   color: #78501c;
 }
+@media (max-width: 360px) {
+  #marker-quick-actions {
+    max-width: calc(100% - 82px);
+  }
+  #marker-quick-actions button {
+    flex-direction: column;
+    min-width: 44px;
+    padding: 4px 6px;
+    gap: 2px;
+    font-size: 11px;
+  }
+}
 #marker-name-editor {
   position: absolute;
   z-index: 16;

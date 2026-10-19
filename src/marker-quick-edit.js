@@ -109,7 +109,17 @@ export class MarkerQuickEdit {
     const { width, height } = this.bounds();
     const w = node.offsetWidth,
       h = node.offsetHeight;
-    node.style.left = `${Math.max(8, Math.min(width - w - 8, x - w / 2))}px`;
+    const controls = this.shell.querySelector(".map-controls");
+    const right =
+      node === this.actions && controls
+        ? Math.min(
+            width - 8,
+            controls.getBoundingClientRect().left -
+              this.shell.getBoundingClientRect().left -
+              8,
+          )
+        : width - 8;
+    node.style.left = `${Math.max(8, Math.min(right - w, x - w / 2))}px`;
     node.style.top = `${Math.max(8, Math.min(height - h - 8, y))}px`;
   }
   labelRect(id) {
