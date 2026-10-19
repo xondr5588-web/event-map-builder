@@ -181,6 +181,8 @@ test("own background, note editing and complete PNG work offline", async ({
   );
   await page.locator("[data-studio=tab][data-id=facilities]").click();
   await page.locator("[data-studio=note]").click();
+  if (mobile(page))
+    await expect(page.locator("#panel")).not.toHaveClass(/open/);
   await page.locator("#command-bar [data-action=center-point]").click();
   await page.locator("#editor").press("Escape");
   await studio(page, "publish");

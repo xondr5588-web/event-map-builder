@@ -220,6 +220,7 @@ export class EventStudio {
       const o = newObject("marker", "note", [c.map.view.center], "안내 문구");
       o.annotation.text = "안내 문구를 입력하세요";
       o.details.audience = "both";
+      c.closePanel();
       c.place([o]);
       c.closeModal();
     }

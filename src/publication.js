@@ -16,7 +16,7 @@ const MAP_STYLE =
   ".object-hit,.label-touch,.handles,.draft{display:none}.object-label rect{fill:#fff;stroke:#b9c8ca}.object-label text{font:600 12px sans-serif;fill:#163432}.label-leader{opacity:.6}.map-object{outline:none}";
 export function schematicSVG(
   project,
-  { visitor = true, width = 1600, height = 950 } = {},
+  { visitor = true, width = 1000, height = 594 } = {},
 ) {
   const p = publicationProject(project, visitor),
     bg = p.meta.event.background;
@@ -188,7 +188,7 @@ export function publicationHTML(
   if (template !== "schedule") {
     const summary = operationalSummary(visitor ? p : project);
     pages.push(
-      `<div class="publication-map">${schematicSVG(project, { visitor, width: 1600, height: template === "operation" ? 860 : 900 })}</div>${template === "operation" ? `<div class="publication-metrics"><span><b>${summary.staff}명</b>계획 인력</span><span><b>${summary.parking}대</b>주차 계획</span><span><b>${summary.cones}개</b>라바콘 추정</span><span><b>${Math.round(summary.routeLength)} m</b>동선 총 길이</span></div>` : ""}`,
+      `<div class="publication-map">${schematicSVG(project, { visitor, width: 1000, height: template === "operation" ? 538 : 563 })}</div>${template === "operation" ? `<div class="publication-metrics"><span><b>${summary.staff}명</b>계획 인력</span><span><b>${summary.parking}대</b>주차 계획</span><span><b>${summary.cones}개</b>라바콘 추정</span><span><b>${Math.round(summary.routeLength)} m</b>동선 총 길이</span></div>` : ""}`,
     );
     for (const group of chunks(facilities, 15))
       pages.push(
