@@ -564,6 +564,10 @@ function insertCopies(copies, label) {
     for (const o of copies) p.settings.layers[o.type] = true;
     editor.selection = new Set(copies.map((o) => o.id));
   });
+  if (copies.some((o) => o.facility)) {
+    map.fit(copies.flatMap(pointsOf), mobile() ? 48 : 96);
+    viewChanged();
+  }
   editor.cb.haptic();
   toast(
     `${copies.length}개 ${label === "객체 복제" ? "복제" : "붙여넣기"} · 실행 취소로 되돌릴 수 있습니다.`,

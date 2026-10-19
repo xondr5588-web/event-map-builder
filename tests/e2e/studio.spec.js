@@ -5,8 +5,10 @@ const mobile = (page) =>
 async function studio(page, tab = "facilities") {
   if (mobile(page) && !(await page.locator("#panel.open").count()))
     await page.locator("#mobile-nav [data-panel=tools]").click();
-  await page.locator(".panel-tabs [data-panel=tools]").click();
-  await page.locator("#panel-content [data-action=studio]").click();
+  const launch = page.locator("#panel-content [data-action=studio]");
+  if (!(await launch.isVisible()))
+    await page.locator(".panel-tabs [data-panel=tools]").click();
+  await launch.click();
   await page.locator(`[data-studio=tab][data-id=${tab}]`).click();
 }
 async function closePanel(page) {
@@ -44,6 +46,9 @@ async function batch(page) {
   await expect(page.locator("#command-bar")).toContainText("8개");
   await page.locator("#command-bar [data-action=center-point]").click();
   await expect(page.locator(".map-object.area")).toHaveCount(8);
+  await expect
+    .poll(async () => Number(await page.locator("#zoom-level").innerText()))
+    .toBeGreaterThan(16);
 }
 test.beforeEach(async ({ page }) => {
   page.errors = [];
@@ -163,8 +168,10 @@ test("own background, note editing and complete PNG work offline", async ({
     buffer: Buffer.from(buffer, "base64"),
   });
   await expect(page.locator("[data-studio-form=background]")).toBeVisible();
-  await page.locator("[name=width]").fill("100");
-  await page.locator("[name=height]").fill("62.5");
+  await page.locator("[data-studio-form=background] [name=width]").fill("100");
+  await page
+    .locator("[data-studio-form=background] [name=height]")
+    .fill("62.5");
   await page
     .locator("[data-studio-form=background] button[type=submit]")
     .click();
@@ -216,7 +223,14 @@ test("festival starting layout makes an editable numbered venue in one action", 
   await studio(page, "publish");
   await page.locator("[data-studio=preview]").click();
   const frame = page.frameLocator("#event-publication iframe");
-  await expect(frame.locator(".publication-map svg")).toBeVisible();
+  await expect(frame.locator(".publication-map > svg")).toBeVisible();
+  for (const kind of ["police", "fire"]) {
+    const box = await frame
+      .locator(`svg[data-symbol=${kind}-emblem]`)
+      .boundingBox();
+    expect(box.width).toBeLessThan(60);
+    expect(box.height).toBeLessThan(60);
+  }
   await expect(frame.locator(".publication-facility")).toHaveCount(24);
   await page.screenshot({ path: testInfo.outputPath("festival-guide.png") });
   await testInfo.attach("festival-guide", {
@@ -281,10 +295,10 @@ test("saved camera survives reload and linked facility rename updates the progra
   await page.locator("[data-studio-form=view] button[type=submit]").click();
   const before = await data(page);
   await closePanel(page);
-  await page.locator("[data-action=zoom-in]").click();
+  await page.locator("[data-action=zoom-out]").click();
   await expect
     .poll(async () => Number(await page.locator("#zoom-level").innerText()))
-    .toBe(before.view.zoom + 1);
+    .toBe(before.view.zoom - 1);
   await studio(page, "background");
   await page.locator("[data-studio=load-view]").first().click();
   await expect(page.locator("#zoom-level")).toHaveText(

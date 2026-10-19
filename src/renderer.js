@@ -314,7 +314,7 @@ export class Renderer {
       );
       let x = anchor.x + o.label.dx * textScale,
         y = anchor.y + o.label.dy * textScale;
-      if (!o.label.manual && !o.label.position) {
+      if (!o.facility && !o.label.manual && !o.label.position) {
         if (o.type === "marker")
           y = Math.max(y, anchor.y + 26 * scale + 13 * textScale + 6);
         const key = `${Math.round(x / (130 * textScale))}:${Math.round(y / (32 * textScale))}`,
@@ -359,11 +359,11 @@ export class Renderer {
         if (e.label.children[1].textContent !== shown)
           e.label.children[1].textContent = shown;
         const w = Math.max(
-          44,
+          o.facility ? 24 : 44,
           Array.from(shown).reduce(
             (s, c) => s + (/[\u1100-\uffff]/.test(c) ? 12 : 7),
             0,
-          ) + 18,
+          ) + (o.facility ? 8 : 18),
         );
         attr(e.label.firstChild, "width", w);
         attr(e.label.firstChild, "x", -w / 2);

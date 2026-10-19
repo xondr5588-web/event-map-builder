@@ -255,7 +255,7 @@ export class MapAdapter {
     }
     const c = { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 },
       s = this.size;
-    let z = 19;
+    let z = 21;
     for (; z > 6; z--) {
       const a = world({ lat: minLat, lng: minLng }, z),
         b = world({ lat: maxLat, lng: maxLng }, z);

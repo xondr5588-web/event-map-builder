@@ -142,7 +142,7 @@ export class EventStudio {
   background() {
     const p = this.cb.project(),
       b = p.meta.event.background;
-    return `<div class="section-title">배경 그림</div><p class="muted small">직접 제작했거나 사용 권한이 있는 행사장 이미지(PNG·JPEG·WebP)를 불러오세요.</p><label class="studio-file">배경 그림 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-studio-file="background"/></label>${b ? form("background", `<p class="small">${esc(b.name)}</p><div class="two-col">${input("width", "실제 너비 (m)", b.width, "number", 'min="1" max="50000" required')}${input("height", "실제 높이 (m)", b.height, "number", 'min="1" max="50000" required')}${input("rotation", "회전 (°)", b.rotation, "number", 'min="-360" max="360"')}${input("opacity", "불투명도 (%)", Math.round(b.opacity * 100), "number", 'min="10" max="100"')}</div><label class="check-label"><input name="enabled" type="checkbox" ${b.enabled ? "checked" : ""}/>그림 표시</label><div class="row">${btn("background-center", "그림을 지도 중심으로")}${btn("background-delete", "그림 삭제", 'class="danger"')}</div>`, "배경 적용") : ""}<div class="section-title">작업 보기</div><div class="studio-views">${[
+    return `<div class="section-title">배경 그림</div><p class="muted small">직접 제작했거나 사용 권한이 있는 행사장 이미지(PNG·JPEG·WebP)를 불러오세요.</p><label class="studio-file">배경 그림 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-studio-file="background"/></label>${b ? form("background", `<p class="small">${esc(b.name)}</p><div class="two-col">${input("width", "실제 너비 (m)", b.width, "number", 'min="1" max="50000" step="any" required')}${input("height", "실제 높이 (m)", b.height, "number", 'min="1" max="50000" step="any" required')}${input("rotation", "회전 (°)", b.rotation, "number", 'min="-360" max="360" step="any"')}${input("opacity", "불투명도 (%)", Math.round(b.opacity * 100), "number", 'min="10" max="100"')}</div><label class="check-label"><input name="enabled" type="checkbox" ${b.enabled ? "checked" : ""}/>그림 표시</label><div class="row">${btn("background-center", "그림을 지도 중심으로")}${btn("background-delete", "그림 삭제", 'class="danger"')}</div>`, "배경 적용") : ""}<div class="section-title">작업 보기</div><div class="studio-views">${[
       ["all", "전체 운영"],
       ["visitor", "방문객 안내"],
       ["emergency", "비상 대응"],
@@ -211,7 +211,7 @@ export class EventStudio {
             .map(([k, t]) => `<option value="${k}">${t}</option>`)
             .join(
               "",
-            )}</select></label><div class="two-col">${input("width", "너비 (m)", 3, "number", 'min="0.5" max="1000" step="0.1" required')}${input("depth", "깊이 (m)", 3, "number", 'min="0.5" max="1000" step="0.1" required')}${input("rows", "줄 수", 2, "number", 'min="1" max="200" required')}${input("columns", "한 줄 개수", 5, "number", 'min="1" max="200" required')}${input("gapX", "가로 간격 (m)", 1, "number", 'min="0" max="1000" step="0.1" required')}${input("gapY", "줄 간격 (m)", 5, "number", 'min="0" max="1000" step="0.1" required')}${input("rotation", "회전 (°)", 0, "number", 'min="-360" max="360"')}${input("start", "시작 번호", 1, "number", 'min="1" max="99999" required')}</div><div class="two-col">${input("prefix", "번호 접두사", "B", "text", 'maxlength="20"')}${input("group", "그룹 이름", "체험 부스", "text", 'maxlength="80" required')}</div><p class="small muted">다음 단계에서 지도를 눌러 배치합니다. 완료 전 미리보기로 위치를 확인하세요. 한 번에 최대 200개.</p>`,
+            )}</select></label><div class="two-col">${input("width", "너비 (m)", 3, "number", 'min="0.5" max="1000" step="0.1" required')}${input("depth", "깊이 (m)", 3, "number", 'min="0.5" max="1000" step="0.1" required')}${input("rows", "줄 수", 2, "number", 'min="1" max="200" required')}${input("columns", "한 줄 개수", 5, "number", 'min="1" max="200" required')}${input("gapX", "가로 간격 (m)", 1, "number", 'min="0" max="1000" step="0.1" required')}${input("gapY", "줄 간격 (m)", 5, "number", 'min="0" max="1000" step="0.1" required')}${input("rotation", "회전 (°)", 0, "number", 'min="-360" max="360" step="any"')}${input("start", "시작 번호", 1, "number", 'min="1" max="99999" required')}</div><div class="two-col">${input("prefix", "번호 접두사", "B", "text", 'maxlength="20"')}${input("group", "그룹 이름", "체험 부스", "text", 'maxlength="80" required')}</div><p class="small muted">다음 단계에서 지도를 눌러 배치합니다. 완료 전 미리보기로 위치를 확인하세요. 한 번에 최대 200개.</p>`,
           "지도에서 배치",
         ),
       );
@@ -242,7 +242,7 @@ export class EventStudio {
         "선택 시설 정렬·회전",
         form(
           "transform",
-          `${input("rotate", "선택 중심 기준 회전 (°)", 0, "number", 'min="-360" max="360"')}<label>중심 정렬<select name="align"><option value="">변경 안 함</option><option value="left">왼쪽</option><option value="center">가로 중심</option><option value="right">오른쪽</option><option value="top">위쪽</option><option value="middle">세로 중심</option><option value="bottom">아래쪽</option></select></label><label>균등 간격<select name="distribute"><option value="">변경 안 함</option><option value="horizontal">가로</option><option value="vertical">세로</option></select></label><p class="small muted">잠긴 객체는 유지합니다. 실행취소로 되돌릴 수 있습니다.</p>`,
+          `${input("rotate", "선택 중심 기준 회전 (°)", 0, "number", 'min="-360" max="360" step="any"')}<label>중심 정렬<select name="align"><option value="">변경 안 함</option><option value="left">왼쪽</option><option value="center">가로 중심</option><option value="right">오른쪽</option><option value="top">위쪽</option><option value="middle">세로 중심</option><option value="bottom">아래쪽</option></select></label><label>균등 간격<select name="distribute"><option value="">변경 안 함</option><option value="horizontal">가로</option><option value="vertical">세로</option></select></label><p class="small muted">잠긴 객체는 유지합니다. 실행취소로 되돌릴 수 있습니다.</p>`,
           "적용",
         ),
       );
@@ -272,7 +272,7 @@ export class EventStudio {
             )
             .join(
               "",
-            )}</select></label><label class="check-label"><input name="listed" type="checkbox" ${d.listed ? "checked" : ""}/>시설 안내 목록에 포함</label>${o.facility ? `<div class="two-col">${input("width", "너비 (m)", o.facility.width, "number", 'min="0.5" max="1000" step="0.1"')}${input("depth", "깊이 (m)", o.facility.depth, "number", 'min="0.5" max="1000" step="0.1"')}${input("rotation", "회전 (°)", o.facility.rotation, "number", 'min="-360" max="360"')}</div><label class="check-label"><input name="resize" type="checkbox"/>입력 규격의 사각형으로 다시 만들기</label>` : ""}`,
+            )}</select></label><label class="check-label"><input name="listed" type="checkbox" ${d.listed ? "checked" : ""}/>시설 안내 목록에 포함</label>${o.facility ? `<div class="two-col">${input("width", "너비 (m)", o.facility.width, "number", 'min="0.5" max="1000" step="0.1"')}${input("depth", "깊이 (m)", o.facility.depth, "number", 'min="0.5" max="1000" step="0.1"')}${input("rotation", "회전 (°)", o.facility.rotation, "number", 'min="-360" max="360" step="any"')}</div><label class="check-label"><input name="resize" type="checkbox"/>입력 규격의 사각형으로 다시 만들기</label>` : ""}`,
         ),
       );
     }
