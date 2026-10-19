@@ -95,13 +95,14 @@ test("owner can continue a project on a second device through the authenticated 
     const mobile =
       p.viewportSize().width <= 760 ||
       (p.viewportSize().width <= 1000 && p.viewportSize().height <= 520);
-    await p
-      .locator(
-        mobile
-          ? "#mobile-nav [data-panel=projects]"
-          : ".panel-tabs [data-panel=projects]",
-      )
-      .click();
+    if (!(await p.locator("#cloud-status").isVisible()))
+      await p
+        .locator(
+          mobile
+            ? "#mobile-nav [data-panel=projects]"
+            : ".panel-tabs [data-panel=projects]",
+        )
+        .click();
     await p.locator("#panel-content [data-action=cloud-sync]").click();
     await expect(p.locator("#cloud-status")).toContainText("클라우드 최신");
   }
