@@ -23,6 +23,8 @@ export class MarkerQuickEdit {
       const o = this.marker();
       if (!o) return;
       if (b.dataset.markerAction === "rename") this.openName(o.id);
+      if (b.dataset.markerAction === "copy") this.cb.copy();
+      if (b.dataset.markerAction === "duplicate") this.cb.duplicate();
       if (b.dataset.markerAction === "lock") {
         this.cb.cancelGesture();
         this.cb.mutate(o.locked ? "마커 잠금 해제" : "마커 잠금", (p) => {
@@ -135,7 +137,7 @@ export class MarkerQuickEdit {
       const focus = this.actions.contains(document.activeElement)
         ? document.activeElement.dataset.markerAction
         : null;
-      this.actions.innerHTML = `<button type="button" data-marker-action="rename" ${o.locked ? "disabled" : ""}>${icon("edit", 16)}이름</button><button type="button" data-marker-action="lock" aria-pressed="${o.locked}">${icon(o.locked ? "unlock" : "lock", 16)}${o.locked ? "잠금 해제" : "잠금"}</button>`;
+      this.actions.innerHTML = `<button type="button" data-marker-action="rename" ${o.locked ? "disabled" : ""}>${icon("edit", 16)}이름</button><button type="button" data-marker-action="duplicate" title="가까이에 사본 만들기 (Ctrl/⌘ D)">${icon("duplicate", 16)}복제</button><button type="button" data-marker-action="copy" title="복사 (Ctrl/⌘ C)">${icon("copy", 16)}복사</button><button type="button" data-marker-action="lock" aria-pressed="${o.locked}">${icon(o.locked ? "unlock" : "lock", 16)}${o.locked ? "잠금 해제" : "잠금"}</button>`;
       this.actions.dataset.markerId = o.id;
       this.key = key;
       if (focus)

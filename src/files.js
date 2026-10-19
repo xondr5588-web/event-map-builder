@@ -28,6 +28,7 @@ export async function exportOverlayPNG(svg, title) {
   const copy = svg.cloneNode(true);
   copy.querySelector(".handles")?.remove();
   copy.querySelector(".draft")?.remove();
+  copy.querySelectorAll(".paste-preview").forEach((n) => n.remove());
   copy.querySelectorAll("[data-locked-indicator]").forEach((n) => n.remove());
   copy
     .querySelectorAll(".selected")

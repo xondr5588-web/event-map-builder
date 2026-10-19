@@ -147,3 +147,39 @@ test("pending name changes finish before starting a drag snapshot", () => {
   assert.equal(f.project().objects[0].name, "새 이름");
   assert.equal(f.history.undo(f.project()).objects[0].name, "새 이름");
 });
+test("paste placement consumes taps without selecting or moving the original marker", () => {
+  const f = fixture(),
+    before = clone(f.project()),
+    placed = [];
+  f.editor.cb.place = (p) => placed.push(p);
+  f.editor.startPlacement(clone(before.objects));
+  f.editor.down(f.event());
+  f.editor.up(f.event());
+  assert.equal(f.editor.selection.size, 0);
+  assert.deepEqual(placed, [{ lat: 35, lng: 128 }]);
+  assert.deepEqual(f.project(), before);
+  assert.equal(f.history.undoStack.length, 0);
+  f.editor.cancel();
+  assert.equal(f.editor.placement, null);
+});
+test("panning, pinch and cancelled touches during paste never create objects", () => {
+  const f = fixture(),
+    before = clone(f.project()),
+    placed = [];
+  f.editor.cb.place = (p) => placed.push(p);
+  f.editor.startPlacement(clone(before.objects));
+  f.editor.down(f.event());
+  f.editor.move(f.event(235, 280));
+  f.editor.up(f.event(235, 280));
+  f.editor.down(f.event());
+  f.editor.down(f.event(260, 300, null, 2));
+  f.editor.up(f.event());
+  f.editor.up(f.event(260, 300, null, 2));
+  f.editor.down(f.event());
+  f.editor.cancelGesture();
+  f.editor.up(f.event());
+  assert.deepEqual(placed, []);
+  assert.deepEqual(f.project(), before);
+  assert.equal(f.calls.pan, 1);
+  assert.equal(f.history.undoStack.length, 0);
+});

@@ -2337,11 +2337,48 @@ kbd {
 }
 #marker-quick-actions button {
   min-height: 44px;
-  padding: 7px 11px;
+  padding: 7px 8px;
   border: 0;
-  gap: 5px;
+  gap: 4px;
   font-size: 12px;
   white-space: nowrap;
+}
+.paste-preview {
+  opacity: 0.55;
+  pointer-events: none;
+}
+#stage.editor-engaged #editor {
+  cursor: crosshair;
+}
+.command-title b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-title > button {
+  flex: 0 0 36px;
+  width: 36px;
+  min-height: 36px;
+  padding: 6px;
+  border: 0;
+}
+@media (max-width: 760px), (max-height: 520px) and (max-width: 1000px) {
+  .command-title > button {
+    flex-basis: 44px;
+    min-height: 44px;
+  }
+  #marker-quick-actions {
+    max-width: calc(100% - 16px);
+  }
+}
+.print-preview .paste-preview {
+  display: none;
+}
+@media print {
+  .paste-preview {
+    display: none !important;
+  }
 }
 #marker-quick-actions button[aria-pressed="true"] {
   background: #fff2db;

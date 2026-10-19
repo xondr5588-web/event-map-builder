@@ -95,6 +95,7 @@ export class Renderer {
     editing = false,
     draft = null,
     vertex = -1,
+    previewIds = new Set(),
   ) {
     // Slider previews never enter the project, persistence journal or undo history.
     const preview = this.markerSizePreview;
@@ -130,14 +131,17 @@ export class Renderer {
       keep.add(o.id);
       const e = this.entries.get(o.id) || this.create(o),
         selected = selection.has(o.id),
-        visible = o.visible && project.settings.layers[o.type];
+        previewing = previewIds.has(o.id),
+        visible = o.visible && (previewing || project.settings.layers[o.type]);
       attr(e.group, "display", visible ? "inline" : "none");
       if (!visible) continue;
       attr(
         e.group,
         "class",
-        `map-object ${o.type}${selected ? " selected" : ""}${o.locked ? " locked" : ""}`,
+        `map-object ${o.type}${selected ? " selected" : ""}${o.locked ? " locked" : ""}${previewing ? " paste-preview" : ""}`,
       );
+      attr(e.group, "tabindex", previewing ? "-1" : "0");
+      attr(e.group, "aria-hidden", previewing ? "true" : "false");
       attr(e.group, "aria-label", `${o.name} (${kindInfo(o)[0]})`);
       const pts = (o.path || [o.position]).map((p) => this.map.project(p)),
         scale = elementScale(project, o, this.map.view.zoom, this.map.size),

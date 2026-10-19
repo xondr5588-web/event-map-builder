@@ -27,6 +27,7 @@ import { icon } from "./icons.js";
 import { markerSymbol } from "./symbols.js";
 import { MarkerSizeControl } from "./marker-size.js";
 import { MarkerQuickEdit } from "./marker-quick-edit.js";
+import { makeCopies, positionCopies } from "./clipboard.js";
 import {
   planningHTML,
   summaryHTML,
@@ -81,6 +82,7 @@ let panel = "tools",
   saveError = false,
   generation = 0,
   clipboard = [],
+  pasteSequence = 0,
   searchSerial = 0,
   installPrompt = null,
   swRegistration = null;
@@ -372,7 +374,7 @@ function renderObjects() {
     )
     .join(
       "",
-    )}</select><button data-action="multi" class="${multi ? "active" : ""}" style="white-space:nowrap;font-size:12px">다중 선택</button></div>${editor.selection.size ? `<div class="bulk-bar"><span>${editor.selection.size}개 선택</span>${button("properties", "속성")}${button("duplicate", "복제")}${button("delete", "삭제")}</div>` : ""}<div class="object-list">${visible.map((o) => `<div class="object-row ${editor.selection.has(o.id) ? "selected" : ""}" style="--object-color:${o.style.color}"><input type="checkbox" data-select="${o.id}" aria-label="${esc(o.name)} 선택" ${editor.selection.has(o.id) ? "checked" : ""}/><button class="object-link" data-object-open="${o.id}" title="선택하고 지도에서 보기">${o.type === "marker" ? markerSymbol(o.kind, 28) : icon(kindInfo(o)[2], 18)}<span>${esc(o.name)}${o.locked ? " 🔒" : ""}<small>${esc(metric(o))}${o.group ? ` · ${esc(o.group)}` : ""}</small></span></button><button class="object-visibility" data-visible="${o.id}" aria-label="${esc(o.name)} ${o.visible ? "숨기기" : "보이기"}">${icon(o.visible ? "eye" : "hidden", 17)}</button></div>`).join("") || `<div class="empty-state">${icon("layers", 28)}${project.objects.length ? "검색 결과가 없습니다." : "아직 배치한 객체가 없습니다.<br>만들기에서 첫 구역을 추가해 보세요."}</div>`}</div>${filtered.length > visible.length ? `<button data-action="more-objects" style="margin-top:12px;width:100%">더 보기 (${visible.length} / ${filtered.length})</button>` : ""}<div class="help-card">여러 객체를 선택해 색상·그룹을 한 번에 바꿀 수 있습니다. 눈 아이콘으로 잠시 숨기세요.</div>`;
+    )}</select><button data-action="multi" class="${multi ? "active" : ""}" style="white-space:nowrap;font-size:12px">다중 선택</button></div>${editor.selection.size ? `<div class="bulk-bar"><span>${editor.selection.size}개 선택</span>${button("properties", "속성")}${button("copy", "복사")}${button("duplicate", "복제")}${button("delete", "삭제")}</div>` : ""}<div class="object-list">${visible.map((o) => `<div class="object-row ${editor.selection.has(o.id) ? "selected" : ""}" style="--object-color:${o.style.color}"><input type="checkbox" data-select="${o.id}" aria-label="${esc(o.name)} 선택" ${editor.selection.has(o.id) ? "checked" : ""}/><button class="object-link" data-object-open="${o.id}" title="선택하고 지도에서 보기">${o.type === "marker" ? markerSymbol(o.kind, 28) : icon(kindInfo(o)[2], 18)}<span>${esc(o.name)}${o.locked ? " 🔒" : ""}<small>${esc(metric(o))}${o.group ? ` · ${esc(o.group)}` : ""}</small></span></button><button class="object-visibility" data-visible="${o.id}" aria-label="${esc(o.name)} ${o.visible ? "숨기기" : "보이기"}">${icon(o.visible ? "eye" : "hidden", 17)}</button></div>`).join("") || `<div class="empty-state">${icon("layers", 28)}${project.objects.length ? "검색 결과가 없습니다." : "아직 배치한 객체가 없습니다.<br>만들기에서 첫 구역을 추가해 보세요."}</div>`}</div>${filtered.length > visible.length ? `<button data-action="more-objects" style="margin-top:12px;width:100%">더 보기 (${visible.length} / ${filtered.length})</button>` : ""}<div class="help-card">여러 객체를 선택해 색상·그룹을 한 번에 바꿀 수 있습니다. 눈 아이콘으로 잠시 숨기세요.</div>`;
 }
 async function renderProjects() {
   const host = $("panel-content");
@@ -420,7 +422,7 @@ function inspectorHTML() {
     return `<div class="empty-state">지도에서 객체를 선택해 주세요.</div>`;
   const many = objects.length > 1,
     locked = objects.every((o) => o.locked);
-  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div>${objects.some((x) => x.type === "marker") ? `<div class="inspector-size">${button("selected-marker-size", "마커 크기 조절", "size")}</div>` : ""}<div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}${objects.some((x) => x.type !== "marker") ? `<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${operationsFields(objects, project)}`;
+  return `<div class="inspector-heading"><span>${many ? `${objects.length}개 객체 선택` : esc(kindInfo(o)[0])}</span>${button("deselect", "", "close")}</div>${objects.some((x) => x.type === "marker") ? `<div class="inspector-size">${button("selected-marker-size", "마커 크기 조절", "size")}</div>` : ""}<div class="stack">${!many ? `<label>객체 이름<input data-prop="name" value="${esc(o.name)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label><label>라벨<input data-prop="label.text" value="${esc(o.label.text)}" maxlength="120" ${o.locked ? "disabled" : ""}/></label>` : ""}<div class="two-col"><label>색상<input type="color" data-prop="style.color" value="${o.style.color}" ${locked ? "disabled" : ""}/></label><label>그룹<input data-prop="group" value="${esc(o.group)}" maxlength="80" placeholder="예: 주차 A팀" ${locked ? "disabled" : ""}/></label></div><div class="two-col">${objects.some((x) => x.type !== "marker") ? `<label>선 두께<input type="number" data-prop="style.width" min="1" max="30" value="${o.style.width}" ${locked ? "disabled" : ""}/></label><label>불투명도 (%)<input type="number" data-prop="style.opacity" min="0" max="100" value="${Math.round(o.style.opacity * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "line" ? `<label>${o.kind === "cone" ? "라바콘" : "화살표"} 간격 (m)<input type="number" data-prop="style.spacing" min="1" max="500" value="${o.style.spacing}" ${o.locked ? "disabled" : ""}/></label>` : ""}${!many && o.type === "marker" ? `<label>회전 (°)<input type="number" data-prop="rotation" step="15" value="${o.rotation}" ${o.locked ? "disabled" : ""}/></label>` : ""}</div><div class="row wrap"><label class="check-label"><input type="checkbox" data-prop="label.visible" ${objects.every((o) => o.label.visible) ? "checked" : ""} ${locked ? "disabled" : ""}/>라벨 표시</label><label class="check-label"><input type="checkbox" data-prop="locked" ${locked ? "checked" : ""}/>잠금</label></div></div>${!many ? `<div class="inspector-metric">${esc(metric(o))}</div>` : ""}<div class="inspector-actions">${!many ? `${button("edit", "위치 편집", "edit", "primary")}${button("fit-selection", "선택 맞춤", "fit")}` : ""}${button("copy", "복사", "copy")}${button("duplicate", "복제", "duplicate")}${clipboard.length ? button("paste", "붙여넣기", "paste") : ""}${button("delete", "삭제", "trash", "danger")}${!many && o.type === "line" ? button("reverse", "방향 반전", "arrow") : ""}${!many && o.type === "marker" ? button("favorite", favorite.includes(o.kind) ? "즐겨찾기 해제" : "즐겨찾기", "star") : ""}${button("front", "맨 앞으로", "up")}${button("back", "맨 뒤로", "down")}</div>${!many ? `<details style="margin-top:13px"><summary class="muted">라벨 위치 조절</summary><div class="two-col" style="margin-top:10px"><label>가로 (px)<input type="number" data-prop="label.dx" min="-5000" max="5000" value="${Math.round(o.label.dx)}" ${o.locked ? "disabled" : ""}/></label><label>세로 (px)<input type="number" data-prop="label.dy" min="-5000" max="5000" value="${Math.round(o.label.dy)}" ${o.locked ? "disabled" : ""}/></label></div>${button("reset-label", "라벨 위치 초기화")}</details>` : ""}${objects.some((x) => x.type !== "marker") ? `<label class="element-size-field">요소 크기 (%)<input type="number" data-prop="style.scale" min="25" max="400" value="${Math.round(o.style.scale * 100)}" ${locked ? "disabled" : ""}/></label>` : ""}${operationsFields(objects, project)}`;
 }
 function renderInspector() {
   if (!editor) return;
@@ -428,6 +430,7 @@ function renderInspector() {
     editor.selection.size > 0 &&
     !editor.tool &&
     !editor.editing &&
+    !editor.placement &&
     $("marker-size-panel").hidden &&
     !printer?.active;
   $("inspector").hidden = !show;
@@ -438,7 +441,7 @@ function renderCommand() {
   if (!editor) return;
   $("stage").classList.toggle(
     "editor-engaged",
-    !!editor.tool || editor.editing,
+    !!editor.tool || editor.editing || !!editor.placement,
   );
   const bar = $("command-bar");
   document
@@ -450,7 +453,9 @@ function renderCommand() {
     .querySelectorAll('[data-action="pan"]')
     .forEach((b) => b.classList.toggle("active", editor.mode === "pan"));
   let text = "";
-  if (editor.tool) {
+  if (editor.placement) {
+    text = `<div class="command-title">${icon("paste", 17)}<b>붙여넣기 · ${editor.placement.length}개</b></div><div class="command-actions">${button("cancel", "취소")}${button("center-point", "중심에 붙여넣기", "paste", "primary")}</div><div class="command-hint">원하는 위치를 탭 · 드래그로 지도 이동 · 두 손가락으로 확대</div>`;
+  } else if (editor.tool) {
     const name = editor.io
       ? `${editor.io} · ${editor.points.length ? "OUT" : "IN"} 위치`
       : kindInfo(editor.tool)[0];
@@ -458,17 +463,19 @@ function renderCommand() {
   } else if (editor.editing) {
     text = `<div class="command-title">${icon("edit", 17)}<b>위치 편집</b><small>점·객체·라벨 드래그</small></div><div class="command-actions">${button("cancel", "편집 종료")}${editor.vertex >= 0 ? button("delete-vertex", `${editor.vertex + 1}번 점 삭제`) : ""}${button("finish", "완료", "check", "primary")}</div><div class="command-hint">작은 +를 눌러 점 추가 · 점을 선택하면 삭제할 수 있습니다.</div>`;
   } else if (mobile() && editor.selection.size) {
-    text = `<div class="command-title"><b>${editor.selection.size === 1 ? esc(selectedObjects()[0]?.name || "객체") : editor.selection.size + "개 선택"}</b>${button("deselect", "", "close")}</div><div class="command-actions">${button("properties", "속성", "settings")}${selectedObjects().some((o) => o.type === "marker") ? button("selected-marker-size", "크기", "size") : ""}${editor.selection.size === 1 ? button("edit", "위치 편집", "edit") : button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash")}</div>`;
+    text = `<div class="command-title"><b>${editor.selection.size === 1 ? esc(selectedObjects()[0]?.name || "객체") : editor.selection.size + "개 선택"}</b><button data-action="copy" title="선택 객체 복사" aria-label="선택 객체 복사">${icon("copy", 17)}</button>${button("deselect", "", "close")}</div><div class="command-actions">${button("properties", "속성", "settings")}${selectedObjects().some((o) => o.type === "marker") ? button("selected-marker-size", "크기", "size") : ""}${clipboard.length ? button("paste", "붙여넣기", "paste") : editor.selection.size === 1 ? button("edit", "위치 편집", "edit") : button("duplicate", "복제", "copy")}${button("delete", "삭제", "trash")}</div>`;
+  } else if (clipboard.length) {
+    text = `<div class="command-title">${icon("copy", 17)}<b>${clipboard.length}개 복사됨</b><button data-action="clear-clipboard" aria-label="복사 내용 비우기" title="복사 내용 비우기">${icon("close", 17)}</button></div><div class="command-actions">${button("paste", "지도에 붙여넣기", "paste", "primary")}</div>`;
   }
   bar.hidden = !text;
   bar.innerHTML = text;
   let cross = $("center-crosshair");
-  if (editor.tool && !cross) {
+  if ((editor.tool || editor.placement) && !cross) {
     cross = document.createElement("div");
     cross.className = "center-crosshair";
     cross.id = "center-crosshair";
     $("map-shell").append(cross);
-  } else if (!editor.tool) cross?.remove();
+  } else if (!editor.tool && !editor.placement) cross?.remove();
 }
 function useTool(type, kind) {
   sizeControl?.close();
@@ -525,29 +532,92 @@ async function createProject() {
     mutate("프로젝트 이름 변경", (p) => (p.title = name)),
   );
 }
+function copySelection() {
+  if (quickEdit?.finishName() === false || printer.active) return;
+  editor.cancelGesture();
+  const objects = selectedObjects();
+  if (!objects.length) {
+    toast("복사할 마커나 객체를 먼저 선택하세요.");
+    return;
+  }
+  clipboard = clone(objects);
+  pasteSequence = 0;
+  editor.setMode("select");
+  closePanel();
+  refresh(false);
+  toast(
+    `${clipboard.length}개 복사 · 붙여넣기를 눌러 원하는 위치에 배치하세요.`,
+  );
+}
+function insertCopies(copies, label) {
+  mutate(label, (p) => {
+    p.objects.push(...copies);
+    for (const o of copies) p.settings.layers[o.type] = true;
+    editor.selection = new Set(copies.map((o) => o.id));
+  });
+  editor.cb.haptic();
+  toast(
+    `${copies.length}개 ${label === "객체 복제" ? "복제" : "붙여넣기"} · 실행 취소로 되돌릴 수 있습니다.`,
+  );
+}
+function canPaste() {
+  if (printer.active || document.body.classList.contains("report-mode"))
+    return false;
+  if (quickEdit?.finishName() === false) return false;
+  if (readOnly) {
+    toast("저장소를 사용할 수 없습니다. JSON 백업 후 다시 열어 주세요.");
+    return false;
+  }
+  return true;
+}
 function duplicateSelection() {
+  if (!canPaste()) return;
+  editor.cancelGesture();
   const selected = selectedObjects();
   if (!selected.length) return;
-  mutate("객체 복제", (p) => {
-    const ids = [];
-    for (const o of selected) {
-      const copy = clone(o);
-      copy.id = uid();
-      copy.name += " 사본";
-      if (copy.label.text === o.name) copy.label.text = copy.name;
-      copy.locked = false;
-      const shift = (c) => {
-        const q = map.project(c);
-        return map.unproject({ x: q.x + 28, y: q.y + 28 });
-      };
-      if (copy.position) copy.position = shift(copy.position);
-      else copy.path = copy.path.map(shift);
-      if (copy.label.position) copy.label.position = shift(copy.label.position);
-      p.objects.push(copy);
-      ids.push(copy.id);
-    }
-    editor.selection = new Set(ids);
-  });
+  const copies = positionCopies(
+    makeCopies(selected, project.objects),
+    map,
+    null,
+    { x: 36, y: 36 },
+  );
+  editor.setMode("select");
+  closePanel();
+  insertCopies(copies, "객체 복제");
+}
+function beginPaste() {
+  if (!canPaste()) return false;
+  if (!clipboard.length) {
+    toast("먼저 마커나 객체를 복사하세요.");
+    return false;
+  }
+  sizeControl.close();
+  closePanel();
+  editor.startPlacement(makeCopies(clipboard, project.objects));
+  return true;
+}
+function placeClipboard(at) {
+  if (!editor.placement || !canPaste()) return;
+  const copies = positionCopies(editor.placement, map, at);
+  editor.setMode("select");
+  insertCopies(copies, "객체 붙여넣기");
+}
+function pasteAtCenter() {
+  if (!beginPaste()) return;
+  // Repeated keyboard pastes remain distinguishable near the visible center.
+  const offsets = [
+    [28, 28],
+    [-28, 28],
+    [28, -28],
+    [-28, -28],
+    [0, 56],
+    [56, 0],
+    [0, -56],
+    [-56, 0],
+  ];
+  const [x, y] = offsets[pasteSequence++ % offsets.length];
+  const q = map.project(map.view.center);
+  placeClipboard(map.unproject({ x: q.x + x, y: q.y + y }));
 }
 function deleteSelection() {
   const removable = selectedObjects().filter((o) => !o.locked);
@@ -633,7 +703,7 @@ function settings() {
 function help() {
   modal(
     "FIELD 사용법",
-    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>마커 이름</b>을 눌러 바로 수정하고, <b>마커 그림</b>을 끌어 위치를 옮기세요. 옆의 <b>잠금 / 잠금 해제</b> 버튼으로 배치를 보호합니다. 도형·흰 점·라벨 위치는 <b>객체 선택 → 위치 편집</b>에서 바꿉니다. 작은 +를 누르면 점이 추가됩니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>운영계획</b>에서 행사·문서 정보를 관리하고, 객체 속성의 <b>현장 배치 정보</b>에 팀·인원·시간·업무지시를 입력하세요. 집계·배치표 CSV·운영계획서 PDF로 연결됩니다.</li><li><b>지도 · 저장 설정</b>에서 축척 연동·전체 크기·기준 확대 수준을 바꿀 수 있습니다. 객체 속성에서는 개별 요소 크기를 조정합니다.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
+    `<ol class="help-list"><li><b>주소·좌표를 검색</b>해 현장으로 이동하세요. 장소명 검색은 설정된 검색 서버를 사용합니다.</li><li><b>만들기 → 종류 선택</b> 후 지도에 점을 놓으세요. 구역은 3점, 동선은 2점 이상 놓고 완료합니다.</li><li><b>마커 이름</b>을 눌러 바로 수정하고, <b>마커 그림</b>을 끌어 위치를 옮기세요. 옆의 <b>잠금 / 잠금 해제</b> 버튼으로 배치를 보호합니다. 도형·흰 점·라벨 위치는 <b>객체 선택 → 위치 편집</b>에서 바꿉니다. 작은 +를 누르면 점이 추가됩니다.</li><li>마커 옆 <b>복제</b>는 가까이에 사본을 만듭니다. <b>복사 → 붙여넣기 → 지도 탭</b>으로 원하는 위치에 배치하세요. 여러 객체는 객체 목록에서 선택 후 복사합니다. 붙여넣기 전 <b>취소</b>로 원본을 그대로 유지합니다.</li><li>스마트폰은 하단 메뉴로 도구창을 열고 닫습니다. 객체를 길게 눌러 편집을 시작할 수도 있습니다. 두 손가락으로 확대하고, 지도 빈 곳을 밀어 이동하세요.</li><li>모든 변경은 자동저장됩니다. 중요한 시점에는 <b>버전 저장</b>을 누르고, JSON 파일도 보관하세요.</li><li><b>운영계획</b>에서 행사·문서 정보를 관리하고, 객체 속성의 <b>현장 배치 정보</b>에 팀·인원·시간·업무지시를 입력하세요. 집계·배치표 CSV·운영계획서 PDF로 연결됩니다.</li><li><b>지도 · 저장 설정</b>에서 축척 연동·전체 크기·기준 확대 수준을 바꿀 수 있습니다. 객체 속성에서는 개별 요소 크기를 조정합니다.</li><li><b>출력</b>에서 용지와 범례를 정한 뒤 PDF / 인쇄를 누르세요. 지도 저작권 표시는 유지됩니다.</li></ol><div class="muted"><kbd>V</kbd> 선택 · <kbd>H</kbd> 이동 · <kbd>F</kbd> 전체 맞춤<br><kbd>Enter</kbd> 완료 · <kbd>Esc</kbd> 취소 · <kbd>Backspace</kbd> 마지막 점 삭제<br><kbd>Ctrl/⌘ Z</kbd> 취소 · <kbd>Ctrl/⌘ Shift Z</kbd> 다시 실행<br><kbd>Ctrl/⌘ S</kbd> 버전 저장 · <kbd>Ctrl/⌘ D</kbd> 복제<br><kbd>Ctrl/⌘ C / V</kbd> 객체 복사 / 지도 중심 근처에 붙여넣기 · <kbd>Shift+클릭</kbd> 다중 선택</div>`,
   );
 }
 async function importFile(file) {
@@ -724,7 +794,8 @@ const actions = {
     renderInspector();
   },
   undo: () => {
-    editor.cancelGesture();
+    if (editor.placement) editor.cancel();
+    else editor.cancelGesture();
     project = history.undo(project);
     editor.points = [];
     editor.vertex = -1;
@@ -732,7 +803,8 @@ const actions = {
     refresh();
   },
   redo: () => {
-    editor.cancelGesture();
+    if (editor.placement) editor.cancel();
+    else editor.cancelGesture();
     project = history.redo(project);
     editor.points = [];
     editor.vertex = -1;
@@ -812,6 +884,16 @@ const actions = {
     renderPanel();
   },
   duplicate: duplicateSelection,
+  copy: copySelection,
+  paste: beginPaste,
+  "paste-center": pasteAtCenter,
+  "clear-clipboard": () => {
+    clipboard = [];
+    pasteSequence = 0;
+    editor.cancel();
+    refresh(false);
+    toast("복사 내용을 비웠습니다.");
+  },
   delete: deleteSelection,
   reverse: () =>
     mutate("방향 반전", (p) =>
@@ -1331,42 +1413,9 @@ window.addEventListener(
     else if (mod && key === "y") action = "redo";
     else if (mod && key === "s") action = "save";
     else if (mod && key === "d") action = "duplicate";
-    else if (mod && key === "c") {
-      clipboard = clone(selectedObjects());
-      if (clipboard.length) {
-        e.preventDefault();
-        toast(`${clipboard.length}개 객체 복사`);
-      }
-      return;
-    } else if (mod && key === "v") {
-      if (!clipboard.length) return;
-      e.preventDefault();
-      mutate("객체 붙여넣기", (p) => {
-        const all = clipboard.flatMap(pointsOf),
-          c = center(all),
-          delta = {
-            lat: map.view.center.lat - c.lat,
-            lng: map.view.center.lng - c.lng,
-          },
-          ids = [];
-        const move = (q) => ({
-          lat: clamp(q.lat + delta.lat, -85, 85),
-          lng: clamp(q.lng + delta.lng, -180, 180),
-        });
-        for (const original of clipboard) {
-          const o = clone(original);
-          o.id = uid();
-          o.locked = false;
-          if (o.position) o.position = move(o.position);
-          else o.path = o.path.map(move);
-          if (o.label.position) o.label.position = move(o.label.position);
-          p.objects.push(o);
-          ids.push(o.id);
-        }
-        editor.selection = new Set(ids);
-      });
-      return;
-    } else if (!mod && e.key === "Enter") action = "finish";
+    else if (mod && key === "c" && editor.selection.size) action = "copy";
+    else if (mod && key === "v" && clipboard.length) action = "paste-center";
+    else if (!mod && e.key === "Enter") action = "finish";
     else if (!mod && e.key === "Backspace" && editor.points.length)
       action = "back-point";
     else if (!mod && (e.key === "Delete" || e.key === "Backspace"))
@@ -1481,6 +1530,7 @@ async function boot() {
     selectionChanged: onSelection,
     beforePointer: () => quickEdit?.finishName(),
     rename: (id) => quickEdit?.openName(id),
+    place: placeClipboard,
     rendered: () => quickEdit?.sync(),
     toolName: () => currentToolName,
     multi: () => multi,
@@ -1509,6 +1559,8 @@ async function boot() {
     svg: $("editor"),
     mutate,
     toast,
+    copy: copySelection,
+    duplicate: duplicateSelection,
     cancelGesture: () => editor.cancelGesture(),
     request: () => editor.request(),
     dragging: () => !!editor.drag?.moved,

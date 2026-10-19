@@ -1,6 +1,7 @@
 import { clone, newObject } from "./model.js";
 import { kindInfo } from "./catalog.js";
 import { labelScale } from "./scaling.js";
+import { positionCopies } from "./clipboard.js";
 import {
   area,
   length,
@@ -23,6 +24,7 @@ export class Editor {
     this.pointers = new Map();
     this.vertex = -1;
     this.tool = null;
+    this.placement = null;
     this.frame = 0;
     svg.addEventListener("pointerdown", (e) => this.down(e));
     svg.addEventListener("pointermove", (e) => this.move(e));
@@ -38,6 +40,7 @@ export class Editor {
         label &&
         !this.editing &&
         !this.tool &&
+        !this.placement &&
         this.mode === "select" &&
         ["Enter", " "].includes(e.key)
       ) {
@@ -66,14 +69,24 @@ export class Editor {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      const copies = this.placement
+        ? positionCopies(
+            this.placement,
+            this.map,
+            this.hover || this.map.view.center,
+          )
+        : [];
       this.renderer.draw(
-        this.project,
+        copies.length
+          ? { ...this.project, objects: [...this.project.objects, ...copies] }
+          : this.project,
         this.selection,
         this.editing,
         this.tool
           ? { ...this.tool, points: this.points, hover: this.hover }
           : null,
         this.vertex,
+        new Set(copies.map((o) => o.id)),
       );
       this.cb.rendered?.();
     });
@@ -89,6 +102,7 @@ export class Editor {
     this.cancelGesture();
     this.mode = mode;
     this.tool = tool;
+    this.placement = null;
     this.points = [];
     this.hover = null;
     this.editing = false;
@@ -107,8 +121,17 @@ export class Editor {
     this.vertex = -1;
     this.mode = "select";
     this.tool = null;
+    this.placement = null;
     this.points = [];
     this.cb.selectionChanged();
+    this.request();
+  }
+  startPlacement(objects) {
+    this.setMode("paste");
+    this.placement = objects;
+    this.selection.clear();
+    this.cb.selectionChanged();
+    this.cb.modeChanged();
     this.request();
   }
   startEdit() {
@@ -173,6 +196,7 @@ export class Editor {
     const quickMarker =
       o?.type === "marker" &&
       !this.tool &&
+      !this.placement &&
       !this.editing &&
       this.mode === "select" &&
       !e.shiftKey &&
@@ -216,7 +240,7 @@ export class Editor {
         : null,
     };
     if (editable && !directMove) this.preview = clone(this.cb.project());
-    if (e.pointerType !== "mouse" && id && !this.tool) {
+    if (e.pointerType !== "mouse" && id && !this.tool && !this.placement) {
       this.longTimer = setTimeout(() => {
         if (this.drag && !this.drag.moved) {
           this.select(id);
@@ -230,7 +254,7 @@ export class Editor {
   move(e) {
     const p = this.xy(e);
     if (!this.pointers.has(e.pointerId)) {
-      if (this.tool) {
+      if (this.tool || this.placement) {
         this.hover = this.map.unproject(p);
         this.request();
       }
@@ -238,6 +262,7 @@ export class Editor {
     }
     this.pointers.set(e.pointerId, p);
     if (this.pointers.size >= 2 && this.pinch) {
+      if (this.placement) this.hover = null;
       const [a, b] = [...this.pointers.values()],
         d = Math.hypot(a.x - b.x, a.y - b.y),
         mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -307,6 +332,7 @@ export class Editor {
       }
       this.request();
     } else {
+      if (this.placement) this.hover = null;
       this.map.panPixels(p.x - d.last.x, p.y - d.last.y);
     }
     d.last = p;
@@ -361,6 +387,10 @@ export class Editor {
       this.request();
       return;
     }
+    if (this.placement) {
+      this.cb.place?.(this.map.unproject(d.start));
+      return;
+    }
     if (this.tool) {
       this.addPoint(this.map.unproject(d.start));
       return;
@@ -375,6 +405,10 @@ export class Editor {
     } else if (!this.editing) this.select(null);
   }
   addPoint(p) {
+    if (this.placement) {
+      this.cb.place?.(p);
+      return;
+    }
     p = this.snap(p);
     if (this.io) {
       this.points.push(p);
@@ -418,6 +452,10 @@ export class Editor {
     this.request();
   }
   finish() {
+    if (this.placement) {
+      this.cb.place?.(this.hover || this.map.view.center);
+      return;
+    }
     if (!this.tool) {
       this.editing = false;
       this.vertex = -1;
